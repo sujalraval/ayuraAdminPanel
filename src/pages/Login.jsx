@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-// Define API base URL based on environment
 const API_BASE_URL = window.location.hostname === 'admin.ayuras.life'
     ? 'https://api.ayuras.life/api/v1'
     : import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
@@ -31,17 +30,18 @@ export default function AdminLogin() {
         setLoading(true);
         setError('');
 
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
+        // Create controller outside try block so we can clear timeout in finally
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
+        try {
             const response = await fetch(`${API_BASE_URL}/admin/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                 },
-                credentials: 'include', // Important for cookies
+                credentials: 'include',
                 signal: controller.signal,
                 body: JSON.stringify({
                     email: formData.email.trim(),
@@ -49,7 +49,13 @@ export default function AdminLogin() {
                 })
             });
 
+            // Clear timeout immediately after response
             clearTimeout(timeoutId);
+
+            // Check if request was aborted
+            if (controller.signal.aborted) {
+                throw new Error('Request was aborted');
+            }
 
             const data = await response.json();
 
@@ -57,7 +63,7 @@ export default function AdminLogin() {
                 throw new Error(data.message || 'Invalid credentials');
             }
 
-            // Store the token in localStorage as fallback
+            // Store token in localStorage as fallback
             if (data.token) {
                 localStorage.setItem('adminToken', data.token);
                 localStorage.setItem('adminUser', JSON.stringify(data.admin));
@@ -67,11 +73,24 @@ export default function AdminLogin() {
             navigate('/admin/dashboard');
 
         } catch (err) {
+            // Clear timeout in case error occurred before response
+            clearTimeout(timeoutId);
+
             console.error('Login error:', err);
-            setError(err.message || 'Login failed. Please try again.');
-            toast.error(err.message || 'Login failed');
+
+            if (err.name === 'AbortError') {
+                setError('Request timed out. Please check your connection and try again.');
+                toast.error('Request timed out');
+            } else if (err.message.includes('Failed to fetch')) {
+                setError('Unable to connect to server. Please check your internet connection.');
+                toast.error('Connection error');
+            } else {
+                setError(err.message || 'Login failed. Please try again.');
+                toast.error(err.message || 'Login failed');
+            }
         } finally {
             setLoading(false);
+            controller.abort(); // Clean up the controller
         }
     };
 
@@ -85,26 +104,12 @@ export default function AdminLogin() {
                     <p className="text-center text-sm text-gray-500 mt-2">
                         API: {API_BASE_URL}
                     </p>
-                    {process.env.NODE_ENV === 'development' && (
-                        <p className="text-center text-xs text-orange-600 mt-1">
-                            Development Mode
-                        </p>
-                    )}
                 </div>
 
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
                     {error && (
                         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                            <div className="flex">
-                                <div className="flex-shrink-0">
-                                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                    </svg>
-                                </div>
-                                <div className="ml-3">
-                                    <p className="text-sm">{error}</p>
-                                </div>
-                            </div>
+                            <p className="text-sm">{error}</p>
                         </div>
                     )}
 
@@ -151,8 +156,8 @@ export default function AdminLogin() {
                             type="submit"
                             disabled={loading || (!formData.email || !formData.password)}
                             className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white transition-colors duration-200 ${loading || (!formData.email || !formData.password)
-                                ? 'bg-gray-400 cursor-not-allowed'
-                                : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
+                                    ? 'bg-gray-400 cursor-not-allowed'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
                                 }`}
                         >
                             {loading ? (
@@ -169,15 +174,6 @@ export default function AdminLogin() {
                         </button>
                     </div>
                 </form>
-
-                {/* Debug information in development */}
-                {process.env.NODE_ENV === 'development' && (
-                    <div className="mt-4 p-3 bg-gray-100 rounded text-xs text-gray-600">
-                        <p><strong>Debug Info:</strong></p>
-                        <p>API URL: {API_BASE_URL}</p>
-                        <p>Environment: {process.env.NODE_ENV}</p>
-                    </div>
-                )}
             </div>
         </div>
     );
