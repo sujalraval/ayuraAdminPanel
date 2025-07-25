@@ -30,7 +30,7 @@ export default function AdminLogin() {
         setLoading(true);
         setError('');
 
-        // Create controller outside try block so we can clear timeout in finally
+        // Create controller and timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -51,11 +51,6 @@ export default function AdminLogin() {
 
             // Clear timeout immediately after response
             clearTimeout(timeoutId);
-
-            // Check if request was aborted
-            if (controller.signal.aborted) {
-                throw new Error('Request was aborted');
-            }
 
             const data = await response.json();
 
@@ -90,7 +85,7 @@ export default function AdminLogin() {
             }
         } finally {
             setLoading(false);
-            controller.abort(); // Clean up the controller
+            // No need to abort here as it might abort a successful request
         }
     };
 
