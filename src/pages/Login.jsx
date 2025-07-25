@@ -33,44 +33,34 @@ export default function AdminLogin() {
         setError('');
 
         try {
-            // CORS-compatible fetch configuration
-            const res = await fetch('https://ayuras.life/api/v1/admin/login', {
+            const response = await fetch('https://ayuras.life/api/v1/admin/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    // Remove any custom headers that might trigger preflight issues
                 },
-                credentials: 'include', // ✅ CRITICAL: Enable cookies/sessions for CORS
-                mode: 'cors', // ✅ Explicitly set CORS mode
+                credentials: 'include', // This is crucial for cookies
                 body: JSON.stringify(formData)
             });
 
-            // ✅ Better error handling for network issues
-            if (!res) {
-                throw new Error('Network error: Unable to connect to server');
+            // First check if we got any response at all
+            if (!response) {
+                throw new Error('No response from server');
             }
 
-            const data = await res.json();
-            console.log('Login response:', data);
-
-            if (!res.ok) {
-                if (res.status === 401) {
-                    throw new Error('Invalid credentials');
-                } else if (res.status === 403) {
-                    throw new Error('Account is deactivated or CORS policy violation');
-                } else if (res.status === 0 || res.status >= 500) {
-                    throw new Error('Server error. Please try again later.');
-                } else {
-                    throw new Error(data.message || `HTTP Error: ${res.status}`);
-                }
+            // Then check if the response was successful
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `Login failed with status ${response.status}`);
             }
+
+            const data = await response.json();
 
             if (!data.token || !data.admin) {
                 throw new Error('Invalid response format from server');
             }
 
-            // Store the token and admin data
+            // Store the token and admin data in localStorage
             localStorage.setItem('adminToken', data.token);
             localStorage.setItem('adminData', JSON.stringify({
                 id: data.admin.id,
@@ -80,7 +70,6 @@ export default function AdminLogin() {
                 permissions: data.admin.permissions || []
             }));
 
-            // ✅ Store token expiry if provided
             if (data.expiresIn) {
                 const expiryTime = new Date().getTime() + (data.expiresIn * 1000);
                 localStorage.setItem('adminTokenExpiry', expiryTime.toString());
@@ -100,11 +89,10 @@ export default function AdminLogin() {
         } catch (err) {
             console.error('Login error:', err);
 
-            // ✅ Better error handling for different error types
             let errorMessage = 'Login failed. Please try again.';
 
-            if (err.name === 'TypeError' && err.message.includes('fetch')) {
-                errorMessage = 'Network error: Please check your internet connection and try again.';
+            if (err.message.includes('Failed to fetch')) {
+                errorMessage = 'Network error: Could not connect to server.';
             } else if (err.message.includes('CORS')) {
                 errorMessage = 'Server configuration error. Please contact support.';
             } else if (err.message) {
@@ -125,7 +113,6 @@ export default function AdminLogin() {
                     <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
                         Admin Log In
                     </h2>
-                    {/* ✅ Add environment indicator for debugging */}
                     {process.env.NODE_ENV === 'development' && (
                         <p className="text-center text-sm text-gray-500 mt-2">
                             API: https://ayuras.life/api/v1
@@ -183,8 +170,8 @@ export default function AdminLogin() {
                             type="submit"
                             disabled={loading}
                             className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white transition-colors duration-200 ${loading
-                                    ? 'bg-gray-400 cursor-not-allowed'
-                                    : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
                                 }`}
                         >
                             {loading ? (
