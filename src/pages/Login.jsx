@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+// Use relative path for API in production
 const API_BASE_URL = window.location.hostname === 'admin.ayuras.life'
-    ? 'https://api.ayuras.life/api/v1'
+    ? '/api/v1'  // Changed to relative path
     : import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
 export default function AdminLogin() {
@@ -30,13 +31,6 @@ export default function AdminLogin() {
         setLoading(true);
         setError('');
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-            controller.abort();
-            setError('Request timed out. Please check your connection and try again.');
-            toast.error('Request timed out');
-        }, 10000);
-
         try {
             const response = await fetch(`${API_BASE_URL}/admin/login`, {
                 method: 'POST',
@@ -45,14 +39,11 @@ export default function AdminLogin() {
                     'Accept': 'application/json',
                 },
                 credentials: 'include',
-                signal: controller.signal,
                 body: JSON.stringify({
                     email: formData.email.trim(),
                     password: formData.password
                 })
             });
-
-            clearTimeout(timeoutId);
 
             const data = await response.json();
 
@@ -60,31 +51,17 @@ export default function AdminLogin() {
                 throw new Error(data.message || 'Invalid credentials');
             }
 
-            if (data.token) {
-                localStorage.setItem('adminToken', data.token);
-                localStorage.setItem('adminUser', JSON.stringify(data.admin));
-            }
+            // Store token and user data
+            localStorage.setItem('adminToken', data.token);
+            localStorage.setItem('adminUser', JSON.stringify(data.admin));
 
             toast.success('Login successful!');
             navigate('/admin/dashboard');
 
         } catch (err) {
-            clearTimeout(timeoutId);
-
-            if (err.name === 'AbortError') {
-                // Already handled by timeout
-                return;
-            }
-
             console.error('Login error:', err);
-
-            if (err.message.includes('Failed to fetch')) {
-                setError('Unable to connect to server. Please check your internet connection.');
-                toast.error('Connection error');
-            } else {
-                setError(err.message || 'Login failed. Please try again.');
-                toast.error(err.message || 'Login failed');
-            }
+            setError(err.message || 'Login failed. Please try again.');
+            toast.error(err.message || 'Login failed');
         } finally {
             setLoading(false);
         }
