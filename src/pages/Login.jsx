@@ -26,60 +26,35 @@ export default function AdminLogin() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        if (!formData.email || !formData.password) {
-            setError('Please fill in all fields');
-            return;
-        }
-
         setLoading(true);
-        setError('');
 
         try {
+            console.log('Sending login request...');
             const response = await fetch(`${API_BASE_URL}/admin/login`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify(formData)
             });
 
+            console.log('Response status:', response.status);
+
             if (!response.ok) {
                 const errorData = await response.json();
+                console.log('Error response:', errorData);
                 throw new Error(errorData.message || 'Login failed');
             }
 
             const data = await response.json();
+            console.log('Login success:', data);
 
-            if (!data.token || !data.admin) {
-                throw new Error('Invalid server response');
-            }
-
-            // Store admin data
+            // Store token and redirect
             localStorage.setItem('adminToken', data.token);
-            localStorage.setItem('adminData', JSON.stringify({
-                id: data.admin.id,
-                role: data.admin.role,
-                email: data.admin.email,
-                name: data.admin.name,
-                permissions: data.admin.permissions || []
-            }));
-
-            toast.success('Login successful!');
-
-            // Redirect based on role
-            if (data.admin.role === 'superadmin') {
-                navigate('/admin/dashboard');
-            } else {
-                navigate('/admin/orders');
-            }
+            navigate('/admin/dashboard');
 
         } catch (err) {
             console.error('Login error:', err);
-            setError(err.message || 'Login failed. Please try again.');
-            toast.error(err.message || 'Login failed. Please try again.');
+            toast.error(err.message);
         } finally {
             setLoading(false);
         }
