@@ -5,7 +5,7 @@ import 'react-toastify/dist/ReactToastify.css';
 
 // Use relative path for API in production
 const API_BASE_URL = window.location.hostname === 'admin.ayuras.life'
-    ? 'https://api.ayuras.life/api/v1'  // Use full domain in production
+    ? 'https://ayuras.life/api/v1'  // Use full domain in production
     : import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
 export default function AdminLogin() {

@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const API_BASE_URL = window.location.hostname === 'admin.ayuras.life'
-    ? 'https://api.ayuras.life/api/v1'
+    ? 'https://ayuras.life/api/v1'
     : import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
 export default function withAdminAuth(Component, allowedRoles = []) {
