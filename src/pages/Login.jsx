@@ -5,7 +5,7 @@ import 'react-toastify/dist/ReactToastify.css';
 
 // Use relative path for API in production
 const API_BASE_URL = window.location.hostname === 'admin.ayuras.life'
-    ? '/api/v1'  // Changed to relative path
+    ? 'https://api.ayuras.life/api/v1'  // Use full domain in production
     : import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
 export default function AdminLogin() {
@@ -45,23 +45,36 @@ export default function AdminLogin() {
                 })
             });
 
-            const data = await response.json();
-
+            // First check if response is OK
             if (!response.ok) {
-                throw new Error(data.message || 'Invalid credentials');
+                // Try to parse error message
+                try {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Login failed');
+                } catch (parseError) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
             }
 
+            const data = await response.json();
+
             // Store token and user data
-            localStorage.setItem('adminToken', data.token);
-            localStorage.setItem('adminUser', JSON.stringify(data.admin));
+            if (data.token) {
+                localStorage.setItem('adminToken', data.token);
+                localStorage.setItem('adminUser', JSON.stringify(data.admin));
+            }
 
             toast.success('Login successful!');
             navigate('/admin/dashboard');
 
         } catch (err) {
             console.error('Login error:', err);
-            setError(err.message || 'Login failed. Please try again.');
-            toast.error(err.message || 'Login failed');
+            const errorMessage = err.message.includes('Unexpected token')
+                ? 'Server returned an invalid response'
+                : err.message;
+
+            setError(errorMessage);
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
