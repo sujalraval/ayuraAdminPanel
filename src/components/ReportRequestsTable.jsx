@@ -11,31 +11,15 @@ const ReportRequestsTable = () => {
     const [debugInfo, setDebugInfo] = useState(null);
     const navigate = useNavigate();
 
-    // Safe way to get environment variables
-    const getApiBaseUrl = () => {
-        // First try to get from environment variables safely
-        if (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_BASE_URL) {
-            return process.env.REACT_APP_API_BASE_URL;
-        }
-
-        // Fallback to window environment variables (if set by build process)
-        if (typeof window !== 'undefined' && window.env && window.env.REACT_APP_API_BASE_URL) {
-            return window.env.REACT_APP_API_BASE_URL;
-        }
-
-        // Default fallback
-        return 'http://localhost:5000/api/v1';
-    };
-
     // Create axios instance with base URL
     const api = axios.create({
-        baseURL: getApiBaseUrl(),
+        baseURL: process.env.REACT_APP_API_BASE_URL || 'https://ayuras.life/api/v1',
+        withCredentials: true,
         timeout: 15000
     });
 
     // Set up interceptors
     useEffect(() => {
-        // Request interceptor
         const requestInterceptor = api.interceptors.request.use(config => {
             const token = localStorage.getItem('adminToken');
             if (token) {
@@ -45,11 +29,8 @@ const ReportRequestsTable = () => {
                 return Promise.reject(new Error('No authentication token found'));
             }
             return config;
-        }, error => {
-            return Promise.reject(error);
         });
 
-        // Response interceptor
         const responseInterceptor = api.interceptors.response.use(
             response => response,
             error => {
@@ -63,12 +44,11 @@ const ReportRequestsTable = () => {
             }
         );
 
-        // Cleanup interceptors on unmount
         return () => {
             api.interceptors.request.eject(requestInterceptor);
             api.interceptors.response.eject(responseInterceptor);
         };
-    }, [navigate, api]);
+    }, [navigate]);
 
     const fetchRequests = async () => {
         try {
