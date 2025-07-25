@@ -29,8 +29,7 @@ export default function AdminLogin() {
         setLoading(true);
 
         try {
-            console.log('Sending login request to:', `${API_BASE_URL}/admin/login`);
-            console.log('Request payload:', formData);
+            console.log('Attempting login with:', formData);
 
             const response = await fetch(`${API_BASE_URL}/admin/login`, {
                 method: 'POST',
@@ -38,33 +37,32 @@ export default function AdminLogin() {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 },
-                credentials: 'include', // Important for cookies
-                body: JSON.stringify(formData)
+                credentials: 'include',
+                body: JSON.stringify({
+                    email: formData.email.trim(),
+                    password: formData.password
+                })
             });
 
-            console.log('Response status:', response.status);
             const data = await response.json();
-            console.log('Response data:', data);
+            console.log('Full response:', { status: response.status, data });
 
             if (!response.ok) {
                 throw new Error(data.message || 'Login failed');
             }
 
-            // Store token in both localStorage and memory
             localStorage.setItem('adminToken', data.token);
-
-            // Redirect to dashboard
             navigate('/admin/dashboard');
             toast.success('Login successful!');
 
         } catch (err) {
             console.error('Login error:', err);
-            setError(err.message || 'Login failed. Please try again.');
-            toast.error(err.message || 'Login failed');
+            toast.error(err.message || 'Login failed. Check console for details.');
         } finally {
             setLoading(false);
         }
     };
+
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
