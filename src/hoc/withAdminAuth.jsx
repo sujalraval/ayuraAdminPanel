@@ -77,7 +77,7 @@ export default function withAdminAuth(Component, allowedRoles = []) {
                 } finally {
                     setIsLoading(false);
                 }
-            };ch
+            };
 
             verifyAuth();
         }, [navigate, allowedRoles]);
