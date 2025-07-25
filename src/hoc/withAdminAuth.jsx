@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '../components/LoadingSpinner';
 
+const API_BASE_URL = window.location.hostname === 'admin.ayuras.life'
+    ? 'https://api.ayuras.life/api/v1'
+    : 'http://localhost:5000/api/v1';
+
 export default function withAdminAuth(Component, allowedRoles = []) {
     return function AuthWrapper(props) {
         const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -12,18 +16,16 @@ export default function withAdminAuth(Component, allowedRoles = []) {
         useEffect(() => {
             const verifyAuth = async () => {
                 try {
+                    // Try to get token from both localStorage and cookies
                     const token = localStorage.getItem('adminToken');
-                    const adminData = JSON.parse(localStorage.getItem('adminData'));
 
-                    if (!token || !adminData) {
-                        localStorage.removeItem('adminToken');
-                        localStorage.removeItem('adminData');
+                    if (!token) {
                         navigate('/admin/login');
                         return;
                     }
 
-                    // Verify token with backend
-                    const response = await fetch('http://localhost:5000/api/v1/admin/profile', {
+                    const response = await fetch(`${API_BASE_URL}/admin/profile`, {
+                        credentials: 'include',
                         headers: {
                             'Authorization': `Bearer ${token}`
                         }
@@ -31,7 +33,7 @@ export default function withAdminAuth(Component, allowedRoles = []) {
 
                     if (!response.ok) {
                         localStorage.removeItem('adminToken');
-                        localStorage.removeItem('adminData');
+                        localStorage.removeItem('adminUser');
                         navigate('/admin/login');
                         toast.error('Session expired. Please login again.');
                         return;
@@ -39,7 +41,6 @@ export default function withAdminAuth(Component, allowedRoles = []) {
 
                     const data = await response.json();
 
-                    // Check role permissions if specified
                     if (allowedRoles.length > 0 && !allowedRoles.includes(data.admin.role)) {
                         navigate('/admin/unauthorized');
                         return;
@@ -49,7 +50,7 @@ export default function withAdminAuth(Component, allowedRoles = []) {
                 } catch (error) {
                     console.error('Auth verification error:', error);
                     localStorage.removeItem('adminToken');
-                    localStorage.removeItem('adminData');
+                    localStorage.removeItem('adminUser');
                     navigate('/admin/login');
                     toast.error('Authentication failed. Please login again.');
                 } finally {

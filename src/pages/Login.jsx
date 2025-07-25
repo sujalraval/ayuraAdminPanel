@@ -4,11 +4,13 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 // Define API base URL based on environment
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+const API_BASE_URL = window.location.hostname === 'admin.ayuras.life'
+    ? 'https://api.ayuras.life/api/v1'
+    : import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
 export default function AdminLogin() {
     const [formData, setFormData] = useState({
-        email: '', // Remove pre-filled values for security
+        email: '',
         password: ''
     });
     const [loading, setLoading] = useState(false);
@@ -30,11 +32,8 @@ export default function AdminLogin() {
         setError('');
 
         try {
-            console.log('Attempting login with API:', API_BASE_URL);
-            console.log('Login attempt for email:', formData.email);
-
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
 
             const response = await fetch(`${API_BASE_URL}/admin/login`, {
                 method: 'POST',
@@ -42,7 +41,7 @@ export default function AdminLogin() {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                 },
-                credentials: 'include',
+                credentials: 'include', // Important for cookies
                 signal: controller.signal,
                 body: JSON.stringify({
                     email: formData.email.trim(),
@@ -52,47 +51,16 @@ export default function AdminLogin() {
 
             clearTimeout(timeoutId);
 
-            let data;
-            const contentType = response.headers.get('content-type');
-
-            if (contentType && contentType.includes('application/json')) {
-                data = await response.json();
-            } else {
-                const text = await response.text();
-                console.error('Non-JSON response:', text);
-                throw new Error('Server returned invalid response format');
-            }
-
-            console.log('API Response:', {
-                status: response.status,
-                statusText: response.statusText,
-                data
-            });
+            const data = await response.json();
 
             if (!response.ok) {
-                // Handle different error scenarios
-                if (response.status === 401) {
-                    throw new Error(data.message || 'Invalid email or password');
-                } else if (response.status === 404) {
-                    throw new Error('Login endpoint not found. Please check the API URL.');
-                } else if (response.status >= 500) {
-                    throw new Error('Server error. Please try again later.');
-                } else {
-                    throw new Error(data.message || `Request failed with status ${response.status}`);
-                }
+                throw new Error(data.message || 'Invalid credentials');
             }
 
-            // Check if token exists in response
-            if (!data.token) {
-                throw new Error('No authentication token received from server');
-            }
-
-            // Store token and redirect
-            localStorage.setItem('adminToken', data.token);
-
-            // Store additional user info if available
-            if (data.user) {
-                localStorage.setItem('adminUser', JSON.stringify(data.user));
+            // Store the token in localStorage as fallback
+            if (data.token) {
+                localStorage.setItem('adminToken', data.token);
+                localStorage.setItem('adminUser', JSON.stringify(data.admin));
             }
 
             toast.success('Login successful!');
@@ -100,17 +68,8 @@ export default function AdminLogin() {
 
         } catch (err) {
             console.error('Login error:', err);
-
-            if (err.name === 'AbortError') {
-                setError('Request timed out. Please check your connection and try again.');
-                toast.error('Request timed out');
-            } else if (err.message.includes('fetch')) {
-                setError('Unable to connect to server. Please check your internet connection.');
-                toast.error('Connection error');
-            } else {
-                setError(err.message || 'Login failed. Please try again.');
-                toast.error(err.message || 'Login failed');
-            }
+            setError(err.message || 'Login failed. Please try again.');
+            toast.error(err.message || 'Login failed');
         } finally {
             setLoading(false);
         }
