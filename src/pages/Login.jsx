@@ -87,9 +87,6 @@ export default function AdminLogin() {
                     <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
                         Admin Login
                     </h2>
-                    <p className="text-center text-sm text-gray-500 mt-2">
-                        API: {API_BASE_URL}
-                    </p>
                 </div>
 
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
