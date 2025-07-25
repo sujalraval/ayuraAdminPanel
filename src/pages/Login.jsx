@@ -16,7 +16,7 @@ export default function AdminLogin() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const navigate = useNavigate();
-s
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({
