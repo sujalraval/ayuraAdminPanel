@@ -4,12 +4,12 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 // Define API base URL based on environment
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://ayuras.life/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
 export default function AdminLogin() {
     const [formData, setFormData] = useState({
-        email: '',
-        password: ''
+        email: 'admin@example.com', // Pre-fill for testing
+        password: 'password123'    // Pre-fill for testing
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -29,32 +29,38 @@ export default function AdminLogin() {
         setLoading(true);
 
         try {
-            console.log('Sending login request...');
+            console.log('Sending login request to:', `${API_BASE_URL}/admin/login`);
+            console.log('Request payload:', formData);
+
             const response = await fetch(`${API_BASE_URL}/admin/login`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                credentials: 'include', // Important for cookies
                 body: JSON.stringify(formData)
             });
 
             console.log('Response status:', response.status);
+            const data = await response.json();
+            console.log('Response data:', data);
 
             if (!response.ok) {
-                const errorData = await response.json();
-                console.log('Error response:', errorData);
-                throw new Error(errorData.message || 'Login failed');
+                throw new Error(data.message || 'Login failed');
             }
 
-            const data = await response.json();
-            console.log('Login success:', data);
-
-            // Store token and redirect
+            // Store token in both localStorage and memory
             localStorage.setItem('adminToken', data.token);
+
+            // Redirect to dashboard
             navigate('/admin/dashboard');
+            toast.success('Login successful!');
 
         } catch (err) {
             console.error('Login error:', err);
-            toast.error(err.message);
+            setError(err.message || 'Login failed. Please try again.');
+            toast.error(err.message || 'Login failed');
         } finally {
             setLoading(false);
         }
@@ -90,7 +96,7 @@ export default function AdminLogin() {
                                 type="email"
                                 required
                                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                                placeholder="Enter your email"
+                                placeholder="admin@example.com"
                                 value={formData.email}
                                 onChange={handleChange}
                                 disabled={loading}
@@ -108,7 +114,7 @@ export default function AdminLogin() {
                                 type="password"
                                 required
                                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                                placeholder="Enter your password"
+                                placeholder="password123"
                                 value={formData.password}
                                 onChange={handleChange}
                                 disabled={loading}
@@ -122,8 +128,8 @@ export default function AdminLogin() {
                             type="submit"
                             disabled={loading}
                             className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white transition-colors duration-200 ${loading
-                                ? 'bg-gray-400 cursor-not-allowed'
-                                : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
+                                    ? 'bg-gray-400 cursor-not-allowed'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
                                 }`}
                         >
                             {loading ? (
