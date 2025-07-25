@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+// Define API base URL based on environment
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://ayuras.life/api/v1';
+
 export default function AdminLogin() {
     const [formData, setFormData] = useState({
         email: '',
@@ -33,34 +36,28 @@ export default function AdminLogin() {
         setError('');
 
         try {
-            const response = await fetch('https://ayuras.life/api/v1/admin/login', {
+            const response = await fetch(`${API_BASE_URL}/admin/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
+                    'Accept': 'application/json'
                 },
-                credentials: 'include', // This is crucial for cookies
+                credentials: 'include',
                 body: JSON.stringify(formData)
             });
 
-            // First check if we got any response at all
-            if (!response) {
-                throw new Error('No response from server');
-            }
-
-            // Then check if the response was successful
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.message || `Login failed with status ${response.status}`);
+                throw new Error(errorData.message || 'Login failed');
             }
 
             const data = await response.json();
 
             if (!data.token || !data.admin) {
-                throw new Error('Invalid response format from server');
+                throw new Error('Invalid server response');
             }
 
-            // Store the token and admin data in localStorage
+            // Store admin data
             localStorage.setItem('adminToken', data.token);
             localStorage.setItem('adminData', JSON.stringify({
                 id: data.admin.id,
@@ -70,37 +67,19 @@ export default function AdminLogin() {
                 permissions: data.admin.permissions || []
             }));
 
-            if (data.expiresIn) {
-                const expiryTime = new Date().getTime() + (data.expiresIn * 1000);
-                localStorage.setItem('adminTokenExpiry', expiryTime.toString());
-            }
-
             toast.success('Login successful!');
 
             // Redirect based on role
             if (data.admin.role === 'superadmin') {
                 navigate('/admin/dashboard');
-            } else if (data.admin.role === 'admin') {
-                navigate('/admin/orders');
             } else {
-                navigate('/admin/lab-tests');
+                navigate('/admin/orders');
             }
 
         } catch (err) {
             console.error('Login error:', err);
-
-            let errorMessage = 'Login failed. Please try again.';
-
-            if (err.message.includes('Failed to fetch')) {
-                errorMessage = 'Network error: Could not connect to server.';
-            } else if (err.message.includes('CORS')) {
-                errorMessage = 'Server configuration error. Please contact support.';
-            } else if (err.message) {
-                errorMessage = err.message;
-            }
-
-            setError(errorMessage);
-            toast.error(errorMessage);
+            setError(err.message || 'Login failed. Please try again.');
+            toast.error(err.message || 'Login failed. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -113,11 +92,9 @@ export default function AdminLogin() {
                     <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
                         Admin Log In
                     </h2>
-                    {process.env.NODE_ENV === 'development' && (
-                        <p className="text-center text-sm text-gray-500 mt-2">
-                            API: https://ayuras.life/api/v1
-                        </p>
-                    )}
+                    <p className="text-center text-sm text-gray-500 mt-2">
+                        API: {API_BASE_URL}
+                    </p>
                 </div>
 
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
