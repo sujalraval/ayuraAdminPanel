@@ -219,7 +219,6 @@ const ReportRequestsTable = () => {
                         >
                             🔄 Retry Loading
                         </button>
-
                     </>
                 )}
             </div>
@@ -239,11 +238,8 @@ const ReportRequestsTable = () => {
                     >
                         🔄 Refresh
                     </button>
-                    
                 </div>
             </div>
-
-
 
             {requests.length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-lg">
