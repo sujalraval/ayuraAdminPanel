@@ -30,9 +30,12 @@ export default function AdminLogin() {
         setLoading(true);
         setError('');
 
-        // Create controller and timeout
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => {
+            controller.abort();
+            setError('Request timed out. Please check your connection and try again.');
+            toast.error('Request timed out');
+        }, 10000);
 
         try {
             const response = await fetch(`${API_BASE_URL}/admin/login`, {
@@ -49,7 +52,6 @@ export default function AdminLogin() {
                 })
             });
 
-            // Clear timeout immediately after response
             clearTimeout(timeoutId);
 
             const data = await response.json();
@@ -58,7 +60,6 @@ export default function AdminLogin() {
                 throw new Error(data.message || 'Invalid credentials');
             }
 
-            // Store token in localStorage as fallback
             if (data.token) {
                 localStorage.setItem('adminToken', data.token);
                 localStorage.setItem('adminUser', JSON.stringify(data.admin));
@@ -68,15 +69,16 @@ export default function AdminLogin() {
             navigate('/admin/dashboard');
 
         } catch (err) {
-            // Clear timeout in case error occurred before response
             clearTimeout(timeoutId);
+
+            if (err.name === 'AbortError') {
+                // Already handled by timeout
+                return;
+            }
 
             console.error('Login error:', err);
 
-            if (err.name === 'AbortError') {
-                setError('Request timed out. Please check your connection and try again.');
-                toast.error('Request timed out');
-            } else if (err.message.includes('Failed to fetch')) {
+            if (err.message.includes('Failed to fetch')) {
                 setError('Unable to connect to server. Please check your internet connection.');
                 toast.error('Connection error');
             } else {
@@ -85,7 +87,6 @@ export default function AdminLogin() {
             }
         } finally {
             setLoading(false);
-            // No need to abort here as it might abort a successful request
         }
     };
 
