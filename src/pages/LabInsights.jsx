@@ -5,6 +5,7 @@ import PopularTestsPanel from '../components/admin/PopularTestsPanel';
 import WhyChoosePanel from '../components/admin/WhyChoosePanel';
 import ExpectationsPanel from '../components/admin/ExpectationsPanel';
 import TestimonialsPanel from '../components/admin/TestimonialsPanel';
+import AdminUsersPanel from '../components/admin/AdminUsersPanel';
 import InsightsDashboard from '../components/InsightsDashboard';
 import axios from 'axios';
 
@@ -37,6 +38,8 @@ const LabInsights = () => {
                     return <ExpectationsPanel {...commonProps} />;
                 case 'testimonials':
                     return <TestimonialsPanel {...commonProps} />;
+                case 'adminUsers':
+                    return <AdminUsersPanel {...commonProps} />;
                 default:
                     return null;
             }
@@ -63,8 +66,8 @@ const LabInsights = () => {
                                 setError(null);
                             }}
                             className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'insights'
-                                    ? 'bg-white text-blue-600 shadow-sm'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
                                 }`}
                         >
                             Insights Dashboard
@@ -75,8 +78,8 @@ const LabInsights = () => {
                                 setError(null);
                             }}
                             className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'admin'
-                                    ? 'bg-white text-blue-600 shadow-sm'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
                                 }`}
                         >
                             Admin Panel
@@ -91,7 +94,7 @@ const LabInsights = () => {
                 <div>
                     <div className="mb-6">
                         <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg overflow-x-auto">
-                            {['categories', 'labTests', 'popularTests', 'whyChoose', 'expectations', 'testimonials'].map((section) => (
+                            {['categories', 'labTests', 'popularTests', 'whyChoose', 'expectations', 'testimonials', 'adminUsers'].map((section) => (
                                 <button
                                     key={section}
                                     onClick={() => {
@@ -99,11 +102,12 @@ const LabInsights = () => {
                                         setError(null);
                                     }}
                                     className={`px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap ${currentSection === section
-                                            ? 'bg-white text-blue-600 shadow-sm'
-                                            : 'text-gray-600 hover:text-gray-900'
+                                        ? 'bg-white text-blue-600 shadow-sm'
+                                        : 'text-gray-600 hover:text-gray-900'
                                         }`}
                                 >
-                                    {section.charAt(0).toUpperCase() + section.slice(1).replace(/([A-Z])/g, ' $1')}
+                                    {section === 'adminUsers' ? 'Admin Users' :
+                                        section.charAt(0).toUpperCase() + section.slice(1).replace(/([A-Z])/g, ' $1')}
                                 </button>
                             ))}
                         </div>
