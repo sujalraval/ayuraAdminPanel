@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, User, LogIn, LogOut, X, Phone, Mail, Calendar, TestTube, Activity, BarChart3, Clock, CheckCircle } from 'lucide-react';
+import axios from 'axios';
 
 const Dashboard = () => {
     const [activeTab, setActiveTab] = useState('new-requests');
@@ -8,46 +9,67 @@ const Dashboard = () => {
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [selectedPatient, setSelectedPatient] = useState(null);
     const [showPatientModal, setShowPatientModal] = useState(false);
+    const [patients, setPatients] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
-    // Mock data
+    // Mock data for lab staff
     const labStaff = {
         name: 'Dr. Sarah Johnson',
         email: 'sarah.johnson@ayuralab.com'
     };
 
-    const mockPatients = [
-        {
-            id: 'PT001',
-            name: 'John Smith',
-            age: 45,
-            contact: '+91 9876543210',
-            email: 'john.smith@email.com',
-            recentTests: ['Blood Test', 'Lipid Profile', 'Thyroid Function']
-        },
-        {
-            id: 'PT002',
-            name: 'Maria Garcia',
-            age: 32,
-            contact: '+91 9876543211',
-            email: 'maria.garcia@email.com',
-            recentTests: ['Complete Blood Count', 'Diabetes Panel']
-        },
-        {
-            id: 'PT003',
-            name: 'David Wilson',
-            age: 58,
-            contact: '+91 9876543212',
-            email: 'david.wilson@email.com',
-            recentTests: ['Cardiac Markers', 'Liver Function Test']
-        }
-    ];
+    // API base URL
+    const API_BASE_URL = process.env.NODE_ENV === 'production'
+        ? 'https://ayuras.life/api/v1'
+        : 'http://localhost:5000/api/v1';
 
-    const handleLogin = () => {
-        setIsLoggedIn(true);
+    useEffect(() => {
+        // Check if user is logged in (e.g., from localStorage or cookies)
+        const token = localStorage.getItem('adminToken');
+        if (token) {
+            setIsLoggedIn(true);
+            fetchPatients();
+        }
+    }, []);
+
+    const fetchPatients = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await axios.get(`${API_BASE_URL}/patients`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                }
+            });
+            setPatients(response.data.data || response.data);
+        } catch (err) {
+            console.error('Error fetching patients:', err);
+            setError('Failed to fetch patients');
+            if (err.response?.status === 401) {
+                handleLogout();
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleLogin = async () => {
+        try {
+            // In a real app, you would have a login form and API call here
+            // For demo purposes, we'll just set isLoggedIn to true
+            setIsLoggedIn(true);
+            localStorage.setItem('adminToken', 'your-auth-token');
+            await fetchPatients();
+        } catch (err) {
+            console.error('Login failed:', err);
+        }
     };
 
     const handleLogout = () => {
         setIsLoggedIn(false);
+        localStorage.removeItem('adminToken');
+        setPatients([]);
     };
 
     const handleSearch = (query) => {
@@ -55,8 +77,8 @@ const Dashboard = () => {
         setShowSearchResults(query.length > 0);
     };
 
-    const filteredPatients = mockPatients.filter(patient =>
-        patient.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const filteredPatients = patients.filter(patient =>
+        patient.name?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     const handlePatientSelect = (patient) => {
@@ -112,7 +134,7 @@ const Dashboard = () => {
                                 Recent Tests
                             </h3>
                             <div className="space-y-2">
-                                {selectedPatient.recentTests.map((test, index) => (
+                                {selectedPatient.recentTests?.map((test, index) => (
                                     <div key={index} className="bg-blue-50 px-3 py-2 rounded-md text-sm text-blue-800">
                                         {test}
                                     </div>
@@ -300,7 +322,11 @@ const Dashboard = () => {
                             {/* Search Results Dropdown */}
                             {showSearchResults && (
                                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
-                                    {filteredPatients.length > 0 ? (
+                                    {loading ? (
+                                        <div className="px-4 py-3 text-gray-500 text-center">Loading...</div>
+                                    ) : error ? (
+                                        <div className="px-4 py-3 text-red-500 text-center">{error}</div>
+                                    ) : filteredPatients.length > 0 ? (
                                         filteredPatients.map((patient) => (
                                             <div
                                                 key={patient.id}
@@ -344,7 +370,7 @@ const Dashboard = () => {
                             ) : (
                                 <button
                                     onClick={handleLogin}
-                                    className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                                    className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
                                 >
                                     <LogIn size={16} />
                                     <span>Login</span>
