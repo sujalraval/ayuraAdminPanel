@@ -12,7 +12,7 @@ const WhyChoosePanel = () => {
 
     useEffect(() => {
         axios
-            .get('/api/v1/why-choose/all')
+            .get('/why-choose/all')
             .then((res) => setWhyChooseItems(res.data))
             .catch((err) => console.error('Failed to fetch why-choose items:', err));
     }, []);
@@ -30,7 +30,7 @@ const WhyChoosePanel = () => {
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this item?')) return;
         try {
-            await axios.delete(`/api/v1/why-choose/${id}`);
+            await axios.delete(`/why-choose/${id}`);
             setWhyChooseItems((prev) => prev.filter((i) => i._id !== id));
         } catch (err) {
             console.error('Delete failed:', err);
@@ -42,7 +42,7 @@ const WhyChoosePanel = () => {
         const newStatus = item.status === 'active' ? 'inactive' : 'active';
 
         try {
-            await axios.put(`/api/v1/why-choose/${id}/status`, { status: newStatus });
+            await axios.put(`/why-choose/${id}/status`, { status: newStatus });
             setWhyChooseItems((prev) =>
                 prev.map((i) => (i._id === id ? { ...i, status: newStatus } : i))
             );
@@ -54,12 +54,12 @@ const WhyChoosePanel = () => {
     const handleSave = async (formData) => {
         try {
             if (editingItem) {
-                const res = await axios.put(`/api/v1/why-choose/${editingItem._id}`, formData);
+                const res = await axios.put(`/why-choose/${editingItem._id}`, formData);
                 setWhyChooseItems((prev) =>
                     prev.map((i) => (i._id === editingItem._id ? res.data : i))
                 );
             } else {
-                const res = await axios.post(`/api/v1/why-choose`, formData);
+                const res = await axios.post(`/why-choose`, formData);
                 setWhyChooseItems((prev) => [...prev, res.data]);
             }
             setShowForm(false);
