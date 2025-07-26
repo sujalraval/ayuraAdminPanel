@@ -9,7 +9,7 @@ const ExpectationsPanel = () => {
     const [editId, setEditId] = useState(null);
 
     const fetchItems = async () => {
-        const res = await axios.get('/api/v1/expectations');
+        const res = await axios.get('/expectations');
         setItems(res.data);
     };
 
@@ -23,11 +23,11 @@ const ExpectationsPanel = () => {
         if (formData.image) form.append('image', formData.image);
 
         if (editId) {
-            await axios.put(`/api/v1/expectations/${editId}`, form, {
+            await axios.put(`/expectations/${editId}`, form, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
         } else {
-            await axios.post('/api/v1/expectations', form, {
+            await axios.post('/expectations', form, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
         }
@@ -42,7 +42,7 @@ const ExpectationsPanel = () => {
     };
 
     const handleDelete = async (id) => {
-        await axios.delete(`/api/v1/expectations/${id}`);
+        await axios.delete(`/expectations/${id}`);
         fetchItems();
     };
 
