@@ -16,7 +16,6 @@ export default function withAdminAuth(Component, allowedRoles = []) {
         useEffect(() => {
             const verifyAuth = async () => {
                 try {
-                    // Get token from localStorage
                     const token = localStorage.getItem('adminToken');
 
                     if (!token) {
@@ -24,7 +23,6 @@ export default function withAdminAuth(Component, allowedRoles = []) {
                         return;
                     }
 
-                    // Create abort controller for timeout
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -40,9 +38,9 @@ export default function withAdminAuth(Component, allowedRoles = []) {
                     clearTimeout(timeoutId);
 
                     if (!response.ok) {
-                        // Clear stored data and redirect to login
                         localStorage.removeItem('adminToken');
                         localStorage.removeItem('adminUser');
+                        localStorage.removeItem('adminRole');
                         navigate('/admin/login');
                         toast.error('Session expired. Please login again.');
                         return;
@@ -50,22 +48,20 @@ export default function withAdminAuth(Component, allowedRoles = []) {
 
                     const data = await response.json();
 
-                    // Check role authorization
                     if (allowedRoles.length > 0 && !allowedRoles.includes(data.admin.role)) {
                         navigate('/admin/unauthorized');
                         return;
                     }
 
-                    // Update stored user data
                     localStorage.setItem('adminUser', JSON.stringify(data.admin));
                     setIsAuthenticated(true);
 
                 } catch (error) {
                     console.error('Auth verification error:', error);
 
-                    // Clear stored data
                     localStorage.removeItem('adminToken');
                     localStorage.removeItem('adminUser');
+                    localStorage.removeItem('adminRole');
 
                     if (error.name === 'AbortError') {
                         toast.error('Connection timeout. Please try again.');

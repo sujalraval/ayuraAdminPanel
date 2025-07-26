@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import withAdminAuth from '../hoc/withAdminAuth.jsx';
-
-// Import your dashboard components
 import Header from '../components/Header';
 import ReportRequests from './ReportRequests';
 import Patients from './Patients';
@@ -23,9 +21,14 @@ function AdminDashboard() {
     }, []);
 
     const handleLogout = () => {
+        // Clear all admin-related localStorage items
         localStorage.removeItem('adminToken');
         localStorage.removeItem('adminRole');
         localStorage.removeItem('adminUser');
+
+        // Clear cookies by setting expired date
+        document.cookie = 'adminToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.ayuras.life';
+
         navigate('/admin/login');
     };
 
@@ -48,8 +51,8 @@ function AdminDashboard() {
                         <button
                             key={tab.id}
                             className={`px-1 py-3 text-sm font-medium whitespace-nowrap ${activeTab === tab.id
-                                ? 'text-red-600 border-b-2 border-red-600'
-                                : 'text-gray-500 hover:text-gray-700'
+                                    ? 'text-red-600 border-b-2 border-red-600'
+                                    : 'text-gray-500 hover:text-gray-700'
                                 }`}
                             onClick={() => setActiveTab(tab.id)}
                         >
@@ -71,5 +74,4 @@ function AdminDashboard() {
     );
 }
 
-// Protect the dashboard - allow admin and labtech roles
 export default withAdminAuth(AdminDashboard, ['admin', 'labtech', 'superadmin']);
