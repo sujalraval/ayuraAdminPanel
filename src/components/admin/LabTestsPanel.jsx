@@ -14,8 +14,8 @@ const LabTestsPanel = () => {
     }, []);
 
     const fetchData = async () => {
-        const tests = await axios.get('/api/v1/lab-tests');
-        const cats = await axios.get('/api/v1/categories/all');
+        const tests = await axios.get('/lab-tests');
+        const cats = await axios.get('/categories/all');
         setLabTests(tests.data);
         setCategories(cats.data);
     };
@@ -34,19 +34,19 @@ const LabTestsPanel = () => {
 
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this test?')) return;
-        await axios.delete(`/api/v1/lab-tests/${id}`);
+        await axios.delete(`/lab-tests/${id}`);
         setLabTests((prev) => prev.filter((t) => t._id !== id));
     };
 
     const handleSave = async () => {
         try {
             if (editingItem) {
-                const res = await axios.put(`/api/v1/lab-tests/${editingItem._id}`, formData);
+                const res = await axios.put(`/lab-tests/${editingItem._id}`, formData);
                 setLabTests((prev) =>
                     prev.map((i) => (i._id === editingItem._id ? res.data : i))
                 );
             } else {
-                const res = await axios.post('/api/v1/lab-tests', formData);
+                const res = await axios.post('/lab-tests', formData);
                 setLabTests((prev) => [...prev, res.data]);
             }
             closeModal();
