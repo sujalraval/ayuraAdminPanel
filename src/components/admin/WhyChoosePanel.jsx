@@ -9,6 +9,12 @@ const WhyChoosePanel = () => {
     const [whyChooseItems, setWhyChooseItems] = useState([]);
     const [showForm, setShowForm] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
+    const [formData, setFormData] = useState({
+        icon: '',
+        title: '',
+        description: '',
+        status: 'active'
+    });
 
     useEffect(() => {
         axios
@@ -18,11 +24,23 @@ const WhyChoosePanel = () => {
     }, []);
 
     const handleAddClick = () => {
+        setFormData({
+            icon: '',
+            title: '',
+            description: '',
+            status: 'active'
+        });
         setEditingItem(null);
         setShowForm(true);
     };
 
     const handleEdit = (item) => {
+        setFormData({
+            icon: item.icon || '',
+            title: item.title || '',
+            description: item.description || '',
+            status: item.status || 'active'
+        });
         setEditingItem(item);
         setShowForm(true);
     };
@@ -51,7 +69,7 @@ const WhyChoosePanel = () => {
         }
     };
 
-    const handleSave = async (formData) => {
+    const handleSave = async () => {
         try {
             if (editingItem) {
                 const res = await axios.put(`/why-choose/${editingItem._id}`, formData);
@@ -103,7 +121,7 @@ const WhyChoosePanel = () => {
                         setShowForm(false);
                         setEditingItem(null);
                     }}
-                    onSubmit={() => handleSave(formData)}
+                    onSubmit={handleSave}
                     renderFields={() => (
                         <>
                             <div className="mb-4">
@@ -111,7 +129,7 @@ const WhyChoosePanel = () => {
                                 <input
                                     type="text"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                                    value={formData.icon || ''}
+                                    value={formData.icon}
                                     onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
                                     required
                                 />
@@ -121,7 +139,7 @@ const WhyChoosePanel = () => {
                                 <input
                                     type="text"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                                    value={formData.title || ''}
+                                    value={formData.title}
                                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                     required
                                 />
@@ -130,10 +148,22 @@ const WhyChoosePanel = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                                 <textarea
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                                    value={formData.description || ''}
+                                    value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                     required
                                 />
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                                <select
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                    value={formData.status}
+                                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                    required
+                                >
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
                             </div>
                         </>
                     )}
