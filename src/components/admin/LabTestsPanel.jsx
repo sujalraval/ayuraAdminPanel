@@ -8,16 +8,32 @@ const LabTestsPanel = () => {
     const [showModal, setShowModal] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
     const [formData, setFormData] = useState({});
+    const [activeTab, setActiveTab] = useState('all'); // 'all', 'categorized', 'uncategorized'
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [activeTab]);
 
     const fetchData = async () => {
-        const tests = await axios.get('/lab-tests');
-        const cats = await axios.get('/categories/all');
-        setLabTests(tests.data);
-        setCategories(cats.data);
+        try {
+            const [testsRes, catsRes] = await Promise.all([
+                axios.get('/lab-tests'),
+                axios.get('/categories/all')
+            ]);
+
+            setCategories(catsRes.data);
+
+            if (activeTab === 'uncategorized') {
+                const uncategorizedRes = await axios.get('/lab-tests/uncategorized');
+                setLabTests(uncategorizedRes.data);
+            } else if (activeTab === 'categorized') {
+                setLabTests(testsRes.data.filter(test => test.category));
+            } else {
+                setLabTests(testsRes.data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch data:', err);
+        }
     };
 
     const openModal = (item = null) => {
@@ -34,8 +50,12 @@ const LabTestsPanel = () => {
 
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this test?')) return;
-        await axios.delete(`/lab-tests/${id}`);
-        setLabTests((prev) => prev.filter((t) => t._id !== id));
+        try {
+            await axios.delete(`/lab-tests/${id}`);
+            setLabTests((prev) => prev.filter((t) => t._id !== id));
+        } catch (err) {
+            console.error('Delete failed:', err);
+        }
     };
 
     const handleSave = async () => {
@@ -51,13 +71,17 @@ const LabTestsPanel = () => {
             }
             closeModal();
         } catch (err) {
-            console.error(err);
+            console.error('Save failed:', err);
         }
     };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
     };
 
     return (
@@ -70,6 +94,28 @@ const LabTestsPanel = () => {
                 >
                     <Plus className="h-4 w-4 mr-2" />
                     Add New
+                </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b mb-4">
+                <button
+                    className={`px-4 py-2 ${activeTab === 'all' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+                    onClick={() => handleTabChange('all')}
+                >
+                    All Tests
+                </button>
+                <button
+                    className={`px-4 py-2 ${activeTab === 'categorized' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+                    onClick={() => handleTabChange('categorized')}
+                >
+                    Categorized
+                </button>
+                <button
+                    className={`px-4 py-2 ${activeTab === 'uncategorized' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+                    onClick={() => handleTabChange('uncategorized')}
+                >
+                    Uncategorized
                 </button>
             </div>
 
@@ -89,9 +135,9 @@ const LabTestsPanel = () => {
                         {labTests.map((test) => (
                             <tr key={test._id} className="border-t">
                                 <td className="px-4 py-2">{test.name}</td>
-                                <td className="px-4 py-2">{test.category}</td>
+                                <td className="px-4 py-2">{test.category || 'None'}</td>
                                 <td className="px-4 py-2">₹{test.price}</td>
-                                <td className="px-4 py-2">{test.status}</td>
+                                <td className="px-4 py-2 capitalize">{test.status}</td>
                                 <td className="px-4 py-2 flex space-x-2">
                                     <button onClick={() => openModal(test)}>
                                         <Edit2 className="w-4 h-4 text-blue-600" />
@@ -102,6 +148,13 @@ const LabTestsPanel = () => {
                                 </td>
                             </tr>
                         ))}
+                        {labTests.length === 0 && (
+                            <tr>
+                                <td colSpan="5" className="px-4 py-4 text-center text-gray-500">
+                                    No tests found
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>
@@ -122,7 +175,7 @@ const LabTestsPanel = () => {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {[
-                                { label: 'Test Name', name: 'name', type: 'text' },
+                                { label: 'Test Name', name: 'name', type: 'text', required: true },
                                 { label: 'Alias', name: 'alias', type: 'text' },
                                 { label: 'Description', name: 'description', type: 'text' },
                                 { label: 'Parameters', name: 'parameters', type: 'text' },
@@ -130,17 +183,21 @@ const LabTestsPanel = () => {
                                 { label: 'Fasting', name: 'fasting', type: 'text' },
                                 { label: 'Age Group', name: 'ageGroup', type: 'text' },
                                 { label: 'Gender', name: 'gender', type: 'text' },
-                                { label: 'Price (₹)', name: 'price', type: 'number' },
+                                { label: 'Price (₹)', name: 'price', type: 'number', required: true },
                                 { label: 'Duration', name: 'duration', type: 'text' }
-                            ].map(({ label, name, type }) => (
+                            ].map(({ label, name, type, required }) => (
                                 <div key={name}>
-                                    <label className="block text-sm font-medium mb-1">{label}</label>
+                                    <label className="block text-sm font-medium mb-1">
+                                        {label}
+                                        {required && <span className="text-red-500">*</span>}
+                                    </label>
                                     <input
                                         name={name}
                                         type={type}
                                         className="w-full px-3 py-2 border rounded"
                                         value={formData[name] || ''}
                                         onChange={handleChange}
+                                        required={required}
                                     />
                                 </div>
                             ))}
@@ -152,7 +209,7 @@ const LabTestsPanel = () => {
                                     value={formData.category || ''}
                                     onChange={handleChange}
                                 >
-                                    <option value="">Select Category</option>
+                                    <option value="">None (Uncategorized)</option>
                                     {categories.map((cat) => (
                                         <option key={cat._id} value={cat.name}>
                                             {cat.name}
