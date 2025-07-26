@@ -10,12 +10,12 @@ const PopularTestsPanel = () => {
     const [formData, setFormData] = useState({});
 
     useEffect(() => {
-        axios.get('/api/v1/popular-tests/admin')
+        axios.get('/popular-tests/admin')
             .then((res) => setPopularTests(res.data.data));
     }, []);
 
     const fetchAvailableLabTests = async () => {
-        const res = await axios.get('/api/v1/popular-tests/available-tests');
+        const res = await axios.get('/popular-tests/available-tests');
         setAvailableLabTests(res.data.data);
     };
 
@@ -38,7 +38,7 @@ const PopularTestsPanel = () => {
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this test?')) return;
         try {
-            await axios.delete(`/api/v1/popular-tests/${id}`);
+            await axios.delete(`/popular-tests/${id}`);
             setPopularTests((prev) => prev.filter((i) => i._id !== id));
         } catch (err) {
             console.error('Delete failed:', err);
@@ -58,12 +58,12 @@ const PopularTestsPanel = () => {
             }
 
             if (editingItem) {
-                const res = await axios.put(`/api/v1/popular-tests/${editingItem._id}`, payload);
+                const res = await axios.put(`/popular-tests/${editingItem._id}`, payload);
                 setPopularTests((prev) =>
                     prev.map((i) => (i._id === editingItem._id ? res.data.data : i))
                 );
             } else {
-                const res = await axios.post('/api/v1/popular-tests', payload);
+                const res = await axios.post('/popular-tests', payload);
                 setPopularTests((prev) => [...prev, res.data.data]);
             }
 
