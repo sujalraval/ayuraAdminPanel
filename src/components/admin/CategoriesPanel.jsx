@@ -13,7 +13,7 @@ const CategoriesPanel = () => {
 
     useEffect(() => {
         axios
-            .get('/api/v1/categories/all')
+            .get('/categories/all')
             .then((res) => setCategories(res.data))
             .catch((err) => console.error('Failed to fetch categories:', err));
     }, []);
@@ -33,7 +33,7 @@ const CategoriesPanel = () => {
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this category?')) return;
         try {
-            await axios.delete(`/api/v1/categories/${id}`);
+            await axios.delete(`/categories/${id}`);
             setCategories((prev) => prev.filter((i) => i._id !== id));
         } catch (err) {
             console.error('Delete failed:', err);
@@ -45,7 +45,7 @@ const CategoriesPanel = () => {
         const newStatus = item.status === 'active' ? 'inactive' : 'active';
 
         try {
-            await axios.put(`/api/v1/categories/${id}`, { ...item, status: newStatus });
+            await axios.put(`/categories/${id}`, { ...item, status: newStatus });
             setCategories((prev) =>
                 prev.map((i) => (i._id === id ? { ...i, status: newStatus } : i))
             );
@@ -57,12 +57,12 @@ const CategoriesPanel = () => {
     const handleSave = async () => {
         try {
             if (editingItem) {
-                const res = await axios.put(`/api/v1/categories/${editingItem._id}`, formData);
+                const res = await axios.put(`/categories/${editingItem._id}`, formData);
                 setCategories((prev) =>
                     prev.map((i) => (i._id === editingItem._id ? res.data : i))
                 );
             } else {
-                const res = await axios.post(`/api/v1/categories`, formData);
+                const res = await axios.post(`/categories`, formData);
                 setCategories((prev) => [...prev, res.data]);
             }
             setShowForm(false);
