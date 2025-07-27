@@ -9,6 +9,7 @@ const ReportRequestsTable = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [debugInfo, setDebugInfo] = useState(null);
+    const [actionLoading, setActionLoading] = useState(null); // Track which action is loading
     const navigate = useNavigate();
 
     // Create axios instance with production base URL
@@ -20,19 +21,43 @@ const ReportRequestsTable = () => {
 
     // Set up interceptors
     useEffect(() => {
-        const requestInterceptor = api.interceptors.request.use(config => {
-            const token = localStorage.getItem('adminToken');
-            if (token) {
-                config.headers.Authorization = `Bearer ${token}`;
-                config.headers['Content-Type'] = 'application/json';
+        const requestInterceptor = api.interceptors.request.use(
+            config => {
+                const token = localStorage.getItem('adminToken');
+                console.log('Request interceptor - Token exists:', !!token);
+
+                if (token) {
+                    // Ensure proper token format
+                    const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+                    config.headers.Authorization = authToken;
+                    config.headers['Content-Type'] = 'application/json';
+                    config.headers['Accept'] = 'application/json';
+
+                    console.log('Request headers set:', {
+                        Authorization: authToken.substring(0, 20) + '...',
+                        'Content-Type': config.headers['Content-Type']
+                    });
+                } else {
+                    console.error('No token found in localStorage');
+                }
+                return config;
+            },
+            error => {
+                console.error('Request interceptor error:', error);
+                return Promise.reject(error);
             }
-            return config;
-        });
+        );
 
         const responseInterceptor = api.interceptors.response.use(
-            response => response,
+            response => {
+                console.log('Response interceptor - Success:', response.status);
+                return response;
+            },
             error => {
+                console.error('Response interceptor - Error:', error.response?.status, error.message);
+
                 if (error.response?.status === 401) {
+                    console.log('401 error - clearing tokens and redirecting');
                     localStorage.removeItem('adminToken');
                     localStorage.removeItem('adminData');
                     toast.error('Session expired. Please log in again.');
@@ -48,37 +73,52 @@ const ReportRequestsTable = () => {
         };
     }, [navigate]);
 
-    // Check authentication without calling /admin/verify
-    const checkAuth = () => {
-        const token = localStorage.getItem('adminToken');
-        const adminData = localStorage.getItem('adminData');
-
-        if (!token || !adminData) {
-            setError("Authentication required. Please log in.");
-            setLoading(false);
-            navigate('/admin/login');
-            return false;
-        }
-
-        // Optionally verify token expiry if you store it
+    // Verify authentication function
+    const verifyAuth = async () => {
         try {
-            const tokenData = JSON.parse(atob(token.split('.')[1])); // Decode JWT payload
-            const currentTime = Date.now() / 1000;
+            console.log('Verifying admin authentication...');
+            const token = localStorage.getItem('adminToken');
 
-            if (tokenData.exp && tokenData.exp < currentTime) {
+            if (!token) {
+                throw new Error('No authentication token found');
+            }
+
+            const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+
+            const response = await api.get('/admin/verify', {
+                headers: {
+                    'Authorization': authToken,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            console.log('Auth response status:', response.status);
+            console.log('Authentication successful:', response.data);
+
+            if (response.data?.admin?.email) {
+                console.log('Admin authentication successful for:', response.data.admin.email);
+            }
+
+            return true;
+        } catch (authError) {
+            console.error('Auth verification failed:', authError);
+
+            if (authError.response?.status === 401 || authError.response?.status === 403) {
                 localStorage.removeItem('adminToken');
                 localStorage.removeItem('adminData');
-                setError("Session expired. Please log in again.");
-                setLoading(false);
+                setError("Authentication failed. Please log in again.");
                 navigate('/admin/login');
                 return false;
             }
-        } catch {
-            // If token parsing fails, continue with the request
-            console.warn('Token parsing failed, continuing with request');
-        }
 
-        return true;
+            // If it's a 404 error (endpoint doesn't exist), continue without verification
+            if (authError.response?.status === 404) {
+                console.log('Auth endpoint not found, continuing without verification');
+                return true;
+            }
+
+            throw authError;
+        }
     };
 
     const fetchRequests = async () => {
@@ -86,8 +126,9 @@ const ReportRequestsTable = () => {
             setLoading(true);
             setError(null);
 
-            // Check authentication first
-            if (!checkAuth()) {
+            // Verify authentication first
+            const authValid = await verifyAuth();
+            if (!authValid) {
                 return;
             }
 
@@ -140,33 +181,70 @@ const ReportRequestsTable = () => {
     const handleAction = async (orderId, action) => {
         try {
             console.log(`Attempting to ${action} order ${orderId}`);
+            setActionLoading(orderId); // Set loading state for this specific order
 
-            // Verify token exists
+            // Verify token exists and format it properly
             const token = localStorage.getItem('adminToken');
             if (!token) {
                 throw new Error('No authentication token found');
             }
 
-            const endpoint = `/orders/${action === 'deny' ? 'deny' : 'approve'}/${orderId}`;
-            const response = await api.put(endpoint, {
-                notes: `Order ${action}ed by admin`
+            // Ensure proper Bearer token format
+            const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+
+            console.log('Action request - Token format check:', {
+                hasToken: !!token,
+                startsWithBearer: token.startsWith('Bearer '),
+                tokenLength: token.length
             });
+
+            const endpoint = `/orders/${action === 'deny' ? 'deny' : 'approve'}/${orderId}`;
+
+            // Make the request with explicit headers
+            const response = await api.put(endpoint,
+                {
+                    notes: `Order ${action}ed by admin`,
+                    timestamp: new Date().toISOString()
+                },
+                {
+                    headers: {
+                        'Authorization': authToken,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                }
+            );
 
             console.log(`${action} response:`, response.data);
 
             toast.success(`Order ${action === 'deny' ? 'denied' : 'approved'} successfully!`);
-            await fetchRequests(); // Refresh list
+
+            // Refresh the list after successful action
+            await fetchRequests();
+
         } catch (err) {
             console.error(`Error ${action}ing order:`, err);
-            const errorMessage = err.response?.data?.message || `Failed to ${action} order`;
-            toast.error(errorMessage);
 
-            // Don't call handleApiError here as it might cause navigation issues
+            let errorMessage = `Failed to ${action} order`;
+
             if (err.response?.status === 401) {
+                errorMessage = "Authentication failed. Please log in again.";
                 localStorage.removeItem('adminToken');
                 localStorage.removeItem('adminData');
                 navigate('/admin/login');
+                return;
+            } else if (err.response?.status === 403) {
+                errorMessage = "Access denied. Insufficient permissions.";
+            } else if (err.response?.status === 404) {
+                errorMessage = "Order not found or endpoint unavailable.";
+            } else if (err.response?.data?.message) {
+                errorMessage = err.response.data.message;
             }
+
+            toast.error(errorMessage);
+
+        } finally {
+            setActionLoading(null); // Clear loading state
         }
     };
 
@@ -221,8 +299,17 @@ const ReportRequestsTable = () => {
 
     // Initial load effect
     useEffect(() => {
+        // Check for token before making any requests
+        const token = localStorage.getItem('adminToken');
+        if (!token) {
+            setError("Authentication required. Please log in.");
+            setLoading(false);
+            navigate('/admin/login');
+            return;
+        }
+
         fetchRequests();
-    }, []); // Remove navigate dependency to prevent infinite loops
+    }, []);
 
     if (loading) {
         return (
@@ -274,9 +361,10 @@ const ReportRequestsTable = () => {
                         </div>
                         <button
                             onClick={fetchRequests}
-                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
+                            disabled={loading}
+                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm disabled:opacity-50"
                         >
-                            Refresh
+                            {loading ? 'Loading...' : 'Refresh'}
                         </button>
                     </div>
 
@@ -388,15 +476,17 @@ const ReportRequestsTable = () => {
                                             <div className="flex space-x-2">
                                                 <button
                                                     onClick={() => handleAction(request._id, 'approve')}
-                                                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs transition-colors"
+                                                    disabled={actionLoading === request._id}
+                                                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
-                                                    ✓ Approve
+                                                    {actionLoading === request._id ? '⏳' : '✓'} Approve
                                                 </button>
                                                 <button
                                                     onClick={() => handleAction(request._id, 'deny')}
-                                                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs transition-colors"
+                                                    disabled={actionLoading === request._id}
+                                                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
-                                                    ✕ Deny
+                                                    {actionLoading === request._id ? '⏳' : '✕'} Deny
                                                 </button>
                                             </div>
                                         </td>
