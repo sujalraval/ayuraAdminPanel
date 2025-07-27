@@ -12,7 +12,7 @@ const TestimonialsPanel = () => {
     const [formData, setFormData] = useState({});
 
     useEffect(() => {
-        axios.get('/api/v1/testimonials').then((res) => setTestimonials(res.data));
+        axios.get('/testimonials').then((res) => setTestimonials(res.data));
     }, []);
 
     const handleAddClick = () => {
@@ -30,7 +30,7 @@ const TestimonialsPanel = () => {
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this testimonial?')) return;
         try {
-            await axios.delete(`/api/v1/testimonials/${id}`);
+            await axios.delete(`/testimonials/${id}`);
             setTestimonials((prev) => prev.filter((i) => i._id !== id));
         } catch (err) {
             console.error('Delete failed:', err);
@@ -48,14 +48,14 @@ const TestimonialsPanel = () => {
 
             let res;
             if (editingItem) {
-                res = await axios.put(`/api/v1/testimonials/${editingItem._id}`, data, {
+                res = await axios.put(`/testimonials/${editingItem._id}`, data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
                 setTestimonials((prev) =>
                     prev.map((i) => (i._id === editingItem._id ? res.data : i))
                 );
             } else {
-                res = await axios.post('/api/v1/testimonials', data, {
+                res = await axios.post('/testimonials', data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
                 setTestimonials((prev) => [...prev, res.data]);
