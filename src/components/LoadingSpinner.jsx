@@ -38,25 +38,4 @@ const LoadingSpinner = ({
     );
 };
 
-// Alternative spinner designs
-export const PulseLoader = ({ className = '' }) => (
-    <div className={`flex space-x-2 ${className}`}>
-        <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-        <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-        <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-    </div>
-);
-
-export const BarLoader = ({ className = '' }) => (
-    <div className={`flex space-x-1 ${className}`}>
-        {[1, 2, 3, 4].map(i => (
-            <div
-                key={i}
-                className="w-1 h-6 bg-blue-500 animate-pulse"
-                style={{ animationDelay: `${i * 0.1}s` }}
-            ></div>
-        ))}
-    </div>
-);
-
 export default LoadingSpinner;
