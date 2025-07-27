@@ -25,9 +25,6 @@ const ReportRequestsTable = () => {
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
                 config.headers['Content-Type'] = 'application/json';
-            } else {
-                navigate('/admin/login');
-                return Promise.reject(new Error('No authentication token found'));
             }
             return config;
         });
@@ -51,20 +48,50 @@ const ReportRequestsTable = () => {
         };
     }, [navigate]);
 
+    // Check authentication without calling /admin/verify
+    const checkAuth = () => {
+        const token = localStorage.getItem('adminToken');
+        const adminData = localStorage.getItem('adminData');
+
+        if (!token || !adminData) {
+            setError("Authentication required. Please log in.");
+            setLoading(false);
+            navigate('/admin/login');
+            return false;
+        }
+
+        // Optionally verify token expiry if you store it
+        try {
+            const tokenData = JSON.parse(atob(token.split('.')[1])); // Decode JWT payload
+            const currentTime = Date.now() / 1000;
+
+            if (tokenData.exp && tokenData.exp < currentTime) {
+                localStorage.removeItem('adminToken');
+                localStorage.removeItem('adminData');
+                setError("Session expired. Please log in again.");
+                setLoading(false);
+                navigate('/admin/login');
+                return false;
+            }
+        } catch {
+            // If token parsing fails, continue with the request
+            console.warn('Token parsing failed, continuing with request');
+        }
+
+        return true;
+    };
+
     const fetchRequests = async () => {
         try {
             setLoading(true);
             setError(null);
 
-            // Verify admin authentication first
-            try {
-                const authCheck = await api.get('/admin/verify');
-                console.log('Auth check successful:', authCheck.data);
-            } catch (authError) {
-                console.error('Auth check failed:', authError);
-                throw new Error('Authentication verification failed');
+            // Check authentication first
+            if (!checkAuth()) {
+                return;
             }
 
+            console.log('Fetching pending orders...');
             const res = await api.get('/orders/pending');
             const ordersData = res.data?.orders || [];
 
@@ -95,9 +122,12 @@ const ReportRequestsTable = () => {
         } else if (err.response?.status === 401) {
             errorMessage = "Session expired. Please log in again.";
             localStorage.removeItem('adminToken');
+            localStorage.removeItem('adminData');
             navigate('/admin/login');
         } else if (err.response?.status === 403) {
             errorMessage = "Access denied. Admin privileges required.";
+        } else if (err.response?.status === 404) {
+            errorMessage = "API endpoint not found. Please contact support.";
         } else if (err.response?.data?.message) {
             errorMessage = err.response.data.message;
         }
@@ -120,22 +150,23 @@ const ReportRequestsTable = () => {
             const endpoint = `/orders/${action === 'deny' ? 'deny' : 'approve'}/${orderId}`;
             const response = await api.put(endpoint, {
                 notes: `Order ${action}ed by admin`
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
             });
 
             console.log(`${action} response:`, response.data);
 
-            toast.success(`Order ${action === 'deny' ? 'denied' : 'approved'}`);
+            toast.success(`Order ${action === 'deny' ? 'denied' : 'approved'} successfully!`);
             await fetchRequests(); // Refresh list
         } catch (err) {
             console.error(`Error ${action}ing order:`, err);
             const errorMessage = err.response?.data?.message || `Failed to ${action} order`;
             toast.error(errorMessage);
-            handleApiError(err);
+
+            // Don't call handleApiError here as it might cause navigation issues
+            if (err.response?.status === 401) {
+                localStorage.removeItem('adminToken');
+                localStorage.removeItem('adminData');
+                navigate('/admin/login');
+            }
         }
     };
 
@@ -154,7 +185,7 @@ const ReportRequestsTable = () => {
             }
 
             return age >= 0 ? age : 'N/A';
-        } catch (error) {
+        } catch {
             return 'N/A';
         }
     };
@@ -169,7 +200,7 @@ const ReportRequestsTable = () => {
                 hour: '2-digit',
                 minute: '2-digit'
             });
-        } catch (error) {
+        } catch {
             return 'N/A';
         }
     };
@@ -188,22 +219,16 @@ const ReportRequestsTable = () => {
         return 'N/A';
     };
 
+    // Initial load effect
     useEffect(() => {
-        // Check if token exists before making the request
-        if (!localStorage.getItem('adminToken')) {
-            setError("Authentication required. Please log in.");
-            setLoading(false);
-            navigate('/admin/login');
-            return;
-        }
-
         fetchRequests();
-    }, []);
+    }, []); // Remove navigate dependency to prevent infinite loops
 
     if (loading) {
         return (
             <div className="flex justify-center items-center min-h-screen">
                 <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+                <p className="ml-4 text-gray-600">Loading pending orders...</p>
             </div>
         );
     }
@@ -216,12 +241,20 @@ const ReportRequestsTable = () => {
                         <div className="text-red-500 text-xl mb-4">⚠️</div>
                         <h3 className="text-lg font-medium text-gray-900 mb-2">Error</h3>
                         <p className="text-gray-600 mb-4">{error}</p>
-                        <button
-                            onClick={fetchRequests}
-                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                        >
-                            Retry
-                        </button>
+                        <div className="space-x-2">
+                            <button
+                                onClick={fetchRequests}
+                                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+                            >
+                                Retry
+                            </button>
+                            <button
+                                onClick={() => navigate('/admin/login')}
+                                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors"
+                            >
+                                Login
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -232,10 +265,20 @@ const ReportRequestsTable = () => {
         <div className="container mx-auto px-4 py-8">
             <div className="bg-white shadow-lg rounded-lg overflow-hidden">
                 <div className="px-6 py-4 bg-gray-50 border-b">
-                    <h2 className="text-xl font-semibold text-gray-800">Pending Order Requests</h2>
-                    <p className="text-sm text-gray-600 mt-1">
-                        {requests.length} pending order{requests.length !== 1 ? 's' : ''} found
-                    </p>
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h2 className="text-xl font-semibold text-gray-800">Pending Order Requests</h2>
+                            <p className="text-sm text-gray-600 mt-1">
+                                {requests.length} pending order{requests.length !== 1 ? 's' : ''} found
+                            </p>
+                        </div>
+                        <button
+                            onClick={fetchRequests}
+                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
+                        >
+                            Refresh
+                        </button>
+                    </div>
 
                     {debugInfo && (
                         <div className="mt-2 text-xs text-gray-500">
@@ -250,6 +293,12 @@ const ReportRequestsTable = () => {
                         <div className="text-gray-400 text-6xl mb-4">📋</div>
                         <h3 className="text-lg font-medium text-gray-900 mb-2">No Pending Requests</h3>
                         <p className="text-gray-600">All orders have been processed</p>
+                        <button
+                            onClick={fetchRequests}
+                            className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+                        >
+                            Check Again
+                        </button>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -280,7 +329,7 @@ const ReportRequestsTable = () => {
                                             <div className="text-sm">
                                                 <div className="font-medium text-gray-900">#{request._id?.slice(-8)}</div>
                                                 <div className="text-gray-500">Created: {formatDate(request.createdAt)}</div>
-                                                <div className="text-gray-500">Status: {request.status}</div>
+                                                <div className="text-gray-500">Status: <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">{request.status}</span></div>
                                             </div>
                                         </td>
 
@@ -297,11 +346,10 @@ const ReportRequestsTable = () => {
 
                                         <td className="px-6 py-4">
                                             <div className="text-sm">
-                                                <div className="font-medium text-gray-900">Status: {request.status}</div>
-                                                <div className="text-gray-500">Payment: {request.paymentMethod || 'N/A'}</div>
+                                                <div className="font-medium text-gray-900">Payment: {request.paymentMethod || 'N/A'}</div>
                                                 <div className="text-gray-500">Total: {getTotalPrice(request.totalPrice)}</div>
                                                 <div className="text-gray-500">Time Slot: {request.patientInfo?.timeSlot || 'Not set'}</div>
-                                                <div className="text-gray-500">Payment Status: {request.paymentStatus || 'N/A'}</div>
+                                                <div className="text-gray-500">Payment Status: <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${request.paymentStatus === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{request.paymentStatus || 'N/A'}</span></div>
                                             </div>
                                         </td>
 
@@ -317,7 +365,7 @@ const ReportRequestsTable = () => {
                                                 </div>
                                                 <div className="mt-2 text-gray-600">
                                                     <div className="font-medium">Tests:</div>
-                                                    <div>{getTestNames(request.cartItems)}</div>
+                                                    <div className="max-w-xs">{getTestNames(request.cartItems)}</div>
                                                     {Array.isArray(request.cartItems) && request.cartItems.length > 0 && (
                                                         <div className="mt-1">
                                                             {request.cartItems.map((item, index) => (
@@ -330,7 +378,7 @@ const ReportRequestsTable = () => {
                                                 </div>
                                                 {request.technicianNotes && (
                                                     <div className="mt-2 text-xs text-gray-500">
-                                                        Notes: {request.technicianNotes}
+                                                        <strong>Notes:</strong> {request.technicianNotes}
                                                     </div>
                                                 )}
                                             </div>
@@ -342,13 +390,13 @@ const ReportRequestsTable = () => {
                                                     onClick={() => handleAction(request._id, 'approve')}
                                                     className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs transition-colors"
                                                 >
-                                                    Approve
+                                                    ✓ Approve
                                                 </button>
                                                 <button
                                                     onClick={() => handleAction(request._id, 'deny')}
                                                     className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs transition-colors"
                                                 >
-                                                    Deny
+                                                    ✕ Deny
                                                 </button>
                                             </div>
                                         </td>
