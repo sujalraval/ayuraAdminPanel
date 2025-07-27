@@ -7,20 +7,26 @@ const api = axios.create({
     withCredentials: true
 });
 
+// FIXED URL construction function
 const getCorrectImageUrl = (imageUrl) => {
     if (!imageUrl) return null;
 
-    // If it's already a full URL with the correct domain, return as is
-    if (imageUrl.startsWith('https://ayuras.life/uploads/')) {
+    console.log('Processing image URL:', imageUrl);
+
+    // If it's already the correct full URL, return as is
+    if (imageUrl.startsWith('https://ayuras.life/uploads/expectations/')) {
+        console.log('URL already correct:', imageUrl);
         return imageUrl;
     }
 
-    // If it's a full URL but with wrong domain, extract filename and reconstruct
+    // If it's any other full URL, extract filename and reconstruct
     if (imageUrl.startsWith('http')) {
         try {
-            const url = new URL(imageUrl);
-            const filename = url.pathname.split('/').pop();
-            return `https://ayuras.life/uploads/expectations/${filename}`;
+            const urlParts = imageUrl.split('/');
+            const filename = urlParts[urlParts.length - 1];
+            const correctedUrl = `https://ayuras.life/uploads/expectations/${filename}`;
+            console.log('Reconstructed URL from:', imageUrl, 'to:', correctedUrl);
+            return correctedUrl;
         } catch (e) {
             console.error('Error parsing image URL:', imageUrl, e);
             return null;
@@ -28,7 +34,25 @@ const getCorrectImageUrl = (imageUrl) => {
     }
 
     // If it's just a filename, construct the full URL
-    return `https://ayuras.life/uploads/expectations/${imageUrl}`;
+    const finalUrl = `https://ayuras.life/uploads/expectations/${imageUrl}`;
+    console.log('Constructed URL from filename:', imageUrl, 'to:', finalUrl);
+    return finalUrl;
+};
+
+// Test image accessibility
+const testImageAccess = async (imageUrl) => {
+    try {
+        console.log('Testing image accessibility:', imageUrl);
+        const response = await fetch(imageUrl, {
+            method: 'HEAD',
+            mode: 'cors'
+        });
+        console.log('Image test result:', imageUrl, 'Status:', response.status, 'OK:', response.ok);
+        return response.ok;
+    } catch (error) {
+        console.error('Image accessibility test failed:', imageUrl, error.message);
+        return false;
+    }
 };
 
 api.interceptors.response.use(
@@ -58,14 +82,27 @@ const ExpectationsPanel = () => {
             setLoading(true);
             console.log('Fetching expectations...');
             const res = await api.get('/expectations');
-            console.log('Fetched expectations:', res.data);
+            console.log('Raw API response:', res.data);
 
-            // Process items with correct URLs
-            const processedItems = res.data.map(item => ({
-                ...item,
-                image: getCorrectImageUrl(item.image)
+            // Process items with correct URLs and test accessibility
+            const processedItems = await Promise.all(res.data.map(async (item) => {
+                const correctedUrl = getCorrectImageUrl(item.image);
+
+                // Test if image is accessible
+                if (correctedUrl) {
+                    const isAccessible = await testImageAccess(correctedUrl);
+                    if (!isAccessible) {
+                        console.warn('Image not accessible:', correctedUrl);
+                    }
+                }
+
+                return {
+                    ...item,
+                    image: correctedUrl
+                };
             }));
 
+            console.log('Processed items:', processedItems);
             setItems(processedItems);
         } catch (error) {
             console.error('Error fetching expectations:', error);
@@ -172,8 +209,29 @@ const ExpectationsPanel = () => {
 
     const handleImageError = (e) => {
         console.error('Image failed to load:', e.target.src);
+
+        // Try alternative URL if this is the main domain URL
+        const originalSrc = e.target.src;
+        if (originalSrc.includes('ayuras.life')) {
+            // Try the test route
+            const filename = originalSrc.split('/').pop();
+            const testUrl = `https://ayuras.life/test-image/${filename}`;
+            console.log('Trying test URL:', testUrl);
+
+            // Set a flag to prevent infinite loops
+            if (!e.target.dataset.retried) {
+                e.target.dataset.retried = 'true';
+                e.target.src = testUrl;
+                return;
+            }
+        }
+
         e.target.onerror = null;
         e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+    };
+
+    const handleImageLoad = (e) => {
+        console.log('Image loaded successfully:', e.target.src);
     };
 
     const handleFileChange = (e) => {
@@ -233,8 +291,11 @@ const ExpectationsPanel = () => {
                                     alt={item.title}
                                     className="w-full h-48 object-cover rounded-lg"
                                     onError={handleImageError}
-                                    onLoad={() => console.log('Image loaded successfully:', item.image)}
+                                    onLoad={handleImageLoad}
                                 />
+                                <p className="text-xs text-gray-500 mt-1 break-all">
+                                    URL: {item.image}
+                                </p>
                             </div>
                         )}
 
