@@ -31,14 +31,6 @@ const getCorrectImageUrl = (imageUrl) => {
     return `https://ayuras.life/uploads/expectations/${imageUrl}`;
 };
 
-api.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        console.error('API Error:', error);
-        return Promise.reject(error);
-    }
-);
-
 const ExpectationsPanel = () => {
     const [items, setItems] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
