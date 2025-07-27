@@ -7,7 +7,7 @@ const api = axios.create({
     withCredentials: true
 });
 
-// FIXED URL construction function
+// Fixed URL construction function
 const getCorrectImageUrl = (imageUrl) => {
     if (!imageUrl) return null;
 
@@ -39,21 +39,7 @@ const getCorrectImageUrl = (imageUrl) => {
     return finalUrl;
 };
 
-// Test image accessibility
-const testImageAccess = async (imageUrl) => {
-    try {
-        console.log('Testing image accessibility:', imageUrl);
-        const response = await fetch(imageUrl, {
-            method: 'HEAD',
-            mode: 'cors'
-        });
-        console.log('Image test result:', imageUrl, 'Status:', response.status, 'OK:', response.ok);
-        return response.ok;
-    } catch (error) {
-        console.error('Image accessibility test failed:', imageUrl, error.message);
-        return false;
-    }
-};
+// REMOVED: testImageAccess function that was causing CORS issues
 
 api.interceptors.response.use(
     (response) => {
@@ -84,23 +70,15 @@ const ExpectationsPanel = () => {
             const res = await api.get('/expectations');
             console.log('Raw API response:', res.data);
 
-            // Process items with correct URLs and test accessibility
-            const processedItems = await Promise.all(res.data.map(async (item) => {
+            // Process items with correct URLs - REMOVED accessibility testing
+            const processedItems = res.data.map((item) => {
                 const correctedUrl = getCorrectImageUrl(item.image);
-
-                // Test if image is accessible
-                if (correctedUrl) {
-                    const isAccessible = await testImageAccess(correctedUrl);
-                    if (!isAccessible) {
-                        console.warn('Image not accessible:', correctedUrl);
-                    }
-                }
 
                 return {
                     ...item,
                     image: correctedUrl
                 };
-            }));
+            });
 
             console.log('Processed items:', processedItems);
             setItems(processedItems);
@@ -163,11 +141,6 @@ const ExpectationsPanel = () => {
             closeModal();
         } catch (error) {
             console.error('Error saving expectation:', error);
-            console.error('Error details:', {
-                message: error.message,
-                status: error.response?.status,
-                data: error.response?.data
-            });
             alert(`Error saving expectation: ${error.response?.data?.error || error.message}`);
         } finally {
             setLoading(false);
@@ -210,18 +183,17 @@ const ExpectationsPanel = () => {
     const handleImageError = (e) => {
         console.error('Image failed to load:', e.target.src);
 
-        // Try alternative URL if this is the main domain URL
+        // Try the direct route if main route fails
         const originalSrc = e.target.src;
-        if (originalSrc.includes('ayuras.life')) {
-            // Try the test route
+        if (originalSrc.includes('/uploads/expectations/') && !originalSrc.includes('/test-image/')) {
             const filename = originalSrc.split('/').pop();
-            const testUrl = `https://ayuras.life/test-image/${filename}`;
-            console.log('Trying test URL:', testUrl);
+            const directUrl = `https://ayuras.life/uploads/expectations/${filename}`;
+            console.log('Trying direct URL:', directUrl);
 
             // Set a flag to prevent infinite loops
             if (!e.target.dataset.retried) {
                 e.target.dataset.retried = 'true';
-                e.target.src = testUrl;
+                e.target.src = directUrl;
                 return;
             }
         }
@@ -292,6 +264,7 @@ const ExpectationsPanel = () => {
                                     className="w-full h-48 object-cover rounded-lg"
                                     onError={handleImageError}
                                     onLoad={handleImageLoad}
+                                    crossOrigin="anonymous"
                                 />
                                 <p className="text-xs text-gray-500 mt-1 break-all">
                                     URL: {item.image}
