@@ -10,7 +10,7 @@ const ExpectationsPanel = () => {
 
     const fetchItems = async () => {
         try {
-            const res = await axios.get('/expectations');
+            const res = await axios.get('/api/v1/expectations');
             setItems(res.data);
         } catch (error) {
             console.error('Error fetching expectations:', error);
@@ -28,11 +28,11 @@ const ExpectationsPanel = () => {
 
         try {
             if (editId) {
-                await axios.put(`/expectations/${editId}`, form, {
+                await axios.put(`/api/v1/expectations/${editId}`, form, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             } else {
-                await axios.post('/expectations', form, {
+                await axios.post('/api/v1/expectations', form, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             }
@@ -55,7 +55,7 @@ const ExpectationsPanel = () => {
 
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`/expectations/${id}`);
+            await axios.delete(`/api/v1/expectations/${id}`);
             fetchItems();
         } catch (error) {
             console.error('Error deleting expectation:', error);
@@ -126,6 +126,7 @@ const ExpectationsPanel = () => {
                                 onError={(e) => {
                                     e.target.onerror = null;
                                     e.target.src = '/placeholder-image.jpg';
+                                    console.error('Failed to load image:', item.image);
                                 }}
                             />
                         )}
