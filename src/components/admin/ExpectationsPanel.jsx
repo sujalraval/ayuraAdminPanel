@@ -68,6 +68,11 @@ const ExpectationsPanel = () => {
         setModalOpen(false);
     };
 
+    const handleImageError = (e) => {
+        e.target.onerror = null;
+        e.target.src = '/placeholder-image.jpg';
+    };
+
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-4">
@@ -123,11 +128,7 @@ const ExpectationsPanel = () => {
                                 src={item.image}
                                 alt={item.title}
                                 className="w-full h-40 object-cover rounded mb-2"
-                                onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src = '/placeholder-image.jpg';
-                                    console.error('Failed to load image:', item.image);
-                                }}
+                                onError={handleImageError}
                             />
                         )}
                         <h3 className="text-lg font-semibold">{item.title}</h3>
