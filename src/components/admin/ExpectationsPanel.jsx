@@ -9,8 +9,12 @@ const ExpectationsPanel = () => {
     const [editId, setEditId] = useState(null);
 
     const fetchItems = async () => {
-        const res = await axios.get('/expectations');
-        setItems(res.data);
+        try {
+            const res = await axios.get('/api/v1/expectations');
+            setItems(res.data);
+        } catch (error) {
+            console.error('Error fetching expectations:', error);
+        }
     };
 
     useEffect(() => { fetchItems(); }, []);
@@ -22,28 +26,40 @@ const ExpectationsPanel = () => {
         form.append('description', formData.description);
         if (formData.image) form.append('image', formData.image);
 
-        if (editId) {
-            await axios.put(`/expectations/${editId}`, form, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-        } else {
-            await axios.post('/expectations', form, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+        try {
+            if (editId) {
+                await axios.put(`/api/v1/expectations/${editId}`, form, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            } else {
+                await axios.post('/api/v1/expectations', form, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            }
+            fetchItems();
+            closeModal();
+        } catch (error) {
+            console.error('Error saving expectation:', error);
         }
-        fetchItems();
-        closeModal();
     };
 
     const handleEdit = (item) => {
-        setFormData({ title: item.title, description: item.description, image: null });
+        setFormData({
+            title: item.title,
+            description: item.description,
+            image: null
+        });
         setEditId(item._id);
         setModalOpen(true);
     };
 
     const handleDelete = async (id) => {
-        await axios.delete(`/expectations/${id}`);
-        fetchItems();
+        try {
+            await axios.delete(`/api/v1/expectations/${id}`);
+            fetchItems();
+        } catch (error) {
+            console.error('Error deleting expectation:', error);
+        }
     };
 
     const closeModal = () => {
@@ -65,7 +81,7 @@ const ExpectationsPanel = () => {
             {modalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-md shadow-md w-full max-w-md relative">
-                        <h3 className="text-xl font-bold mb-4">{editId ? 'Edit' : 'Add'} Service</h3>
+                        <h3 className="text-xl font-bold mb-4">{editId ? 'Edit' : 'Add'} Expectation</h3>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <input
                                 type="text"
@@ -87,6 +103,7 @@ const ExpectationsPanel = () => {
                                 accept="image/*"
                                 className="w-full border p-2"
                                 onChange={(e) => setFormData({ ...formData, image: e.target.files[0] })}
+                                required={!editId}
                             />
                             <div className="flex justify-end space-x-2">
                                 <button type="button" onClick={closeModal} className="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
@@ -101,7 +118,17 @@ const ExpectationsPanel = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {items.map(item => (
                     <div key={item._id} className="border rounded p-4 shadow">
-                        <img src={`/uploads/expectations/${item.image}`} alt={item.title} className="w-full h-40 object-cover rounded mb-2" />
+                        {item.image && (
+                            <img
+                                src={item.image}
+                                alt={item.title}
+                                className="w-full h-40 object-cover rounded mb-2"
+                                onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = '/placeholder-image.jpg';
+                                }}
+                            />
+                        )}
                         <h3 className="text-lg font-semibold">{item.title}</h3>
                         <p className="text-sm text-gray-700">{item.description}</p>
                         <div className="flex gap-2 mt-3">
