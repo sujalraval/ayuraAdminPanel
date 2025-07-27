@@ -24,6 +24,7 @@ const ReportRequestsTable = () => {
             const token = localStorage.getItem('adminToken');
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
+                config.headers['Content-Type'] = 'application/json';
             } else {
                 navigate('/admin/login');
                 return Promise.reject(new Error('No authentication token found'));
@@ -55,10 +56,13 @@ const ReportRequestsTable = () => {
             setLoading(true);
             setError(null);
 
-            // Check if token exists
-            if (!localStorage.getItem('adminToken')) {
-                navigate('/admin/login');
-                return;
+            // Verify admin authentication first
+            try {
+                const authCheck = await api.get('/admin/verify');
+                console.log('Auth check successful:', authCheck.data);
+            } catch (authError) {
+                console.error('Auth check failed:', authError);
+                throw new Error('Authentication verification failed');
             }
 
             const res = await api.get('/orders/pending');
@@ -105,31 +109,35 @@ const ReportRequestsTable = () => {
 
     const handleAction = async (orderId, action) => {
         try {
+            console.log(`Attempting to ${action} order ${orderId}`);
+
+            // Verify token exists
+            const token = localStorage.getItem('adminToken');
+            if (!token) {
+                throw new Error('No authentication token found');
+            }
+
             const endpoint = `/orders/${action === 'deny' ? 'deny' : 'approve'}/${orderId}`;
-            await api.put(endpoint, {
+            const response = await api.put(endpoint, {
                 notes: `Order ${action}ed by admin`
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
+
+            console.log(`${action} response:`, response.data);
 
             toast.success(`Order ${action === 'deny' ? 'denied' : 'approved'}`);
             await fetchRequests(); // Refresh list
         } catch (err) {
+            console.error(`Error ${action}ing order:`, err);
             const errorMessage = err.response?.data?.message || `Failed to ${action} order`;
             toast.error(errorMessage);
             handleApiError(err);
         }
     };
-
-    useEffect(() => {
-        // Check if token exists before making the request
-        if (!localStorage.getItem('adminToken')) {
-            setError("Authentication required. Please log in.");
-            setLoading(false);
-            navigate('/admin/login');
-            return;
-        }
-
-        fetchRequests();
-    }, []);
 
     const calculateAge = (dob) => {
         if (!dob) return 'N/A';
@@ -179,6 +187,18 @@ const ReportRequestsTable = () => {
         }
         return 'N/A';
     };
+
+    useEffect(() => {
+        // Check if token exists before making the request
+        if (!localStorage.getItem('adminToken')) {
+            setError("Authentication required. Please log in.");
+            setLoading(false);
+            navigate('/admin/login');
+            return;
+        }
+
+        fetchRequests();
+    }, []);
 
     if (loading) {
         return (
