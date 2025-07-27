@@ -8,6 +8,23 @@ const api = axios.create({
     withCredentials: true
 });
 
+// Helper function to ensure correct image URL
+const getCorrectImageUrl = (imageUrl) => {
+    if (!imageUrl) return null;
+
+    // If it's already a full URL, return as is
+    if (imageUrl.startsWith('http')) {
+        // But if it's pointing to admin subdomain, fix it to main domain
+        if (imageUrl.includes('admin.ayuras.life')) {
+            return imageUrl.replace('admin.ayuras.life', 'ayuras.life');
+        }
+        return imageUrl;
+    }
+
+    // If it's just a filename, construct the full URL
+    return `https://ayuras.life/uploads/expectations/${imageUrl}`;
+};
+
 // Add response interceptor to log responses
 api.interceptors.response.use(
     (response) => {
@@ -40,7 +57,10 @@ const ExpectationsPanel = () => {
 
             // Log each image URL
             res.data.forEach((item, index) => {
-                console.log(`Item ${index + 1} - ID: ${item._id}, Image URL: ${item.image}`);
+                const correctedUrl = getCorrectImageUrl(item.image);
+                console.log(`Item ${index + 1} - ID: ${item._id}, Original: ${item.image}, Corrected: ${correctedUrl}`);
+                // Update the item with corrected URL
+                item.image = correctedUrl;
             });
 
             setItems(res.data);
@@ -231,16 +251,16 @@ const ExpectationsPanel = () => {
                                 {item.image ? (
                                     <>
                                         <img
-                                            src={item.image}
+                                            src={getCorrectImageUrl(item.image)}
                                             alt={item.title}
                                             className="w-full h-full object-cover"
                                             onError={handleImageError}
-                                            onLoad={() => console.log('Image loaded successfully:', item.image)}
+                                            onLoad={() => console.log('Image loaded successfully:', getCorrectImageUrl(item.image))}
                                             loading="lazy"
                                         />
                                         <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
                                             <button
-                                                onClick={() => testImageUrl(item.image)}
+                                                onClick={() => testImageUrl(getCorrectImageUrl(item.image))}
                                                 className="hover:underline"
                                             >
                                                 Test URL
@@ -277,7 +297,7 @@ const ExpectationsPanel = () => {
                                 </div>
                                 {item.image && (
                                     <div className="mt-1 text-xs text-blue-600 break-all">
-                                        <a href={item.image} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                        <a href={getCorrectImageUrl(item.image)} target="_blank" rel="noopener noreferrer" className="hover:underline">
                                             View Image
                                         </a>
                                     </div>
