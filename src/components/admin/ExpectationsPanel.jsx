@@ -10,7 +10,7 @@ const ExpectationsPanel = () => {
 
     const fetchItems = async () => {
         try {
-            const res = await axios.get('/api/v1/expectations');
+            const res = await axios.get('/expectations');
             setItems(res.data);
         } catch (error) {
             console.error('Error fetching expectations:', error);
@@ -28,11 +28,11 @@ const ExpectationsPanel = () => {
 
         try {
             if (editId) {
-                await axios.put(`/api/v1/expectations/${editId}`, form, {
+                await axios.put(`/expectations/${editId}`, form, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             } else {
-                await axios.post('/api/v1/expectations', form, {
+                await axios.post('/expectations', form, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             }
@@ -55,7 +55,7 @@ const ExpectationsPanel = () => {
 
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`/api/v1/expectations/${id}`);
+            await axios.delete(`/expectations/${id}`);
             fetchItems();
         } catch (error) {
             console.error('Error deleting expectation:', error);
