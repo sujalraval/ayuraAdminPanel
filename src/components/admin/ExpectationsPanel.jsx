@@ -7,15 +7,11 @@ const api = axios.create({
     withCredentials: true
 });
 
-// Fixed URL construction function
 const getCorrectImageUrl = (imageUrl) => {
     if (!imageUrl) return null;
 
-    console.log('Processing image URL:', imageUrl);
-
     // If it's already the correct full URL, return as is
     if (imageUrl.startsWith('https://ayuras.life/uploads/expectations/')) {
-        console.log('URL already correct:', imageUrl);
         return imageUrl;
     }
 
@@ -24,9 +20,7 @@ const getCorrectImageUrl = (imageUrl) => {
         try {
             const urlParts = imageUrl.split('/');
             const filename = urlParts[urlParts.length - 1];
-            const correctedUrl = `https://ayuras.life/uploads/expectations/${filename}`;
-            console.log('Reconstructed URL from:', imageUrl, 'to:', correctedUrl);
-            return correctedUrl;
+            return `https://ayuras.life/uploads/expectations/${filename}`;
         } catch (e) {
             console.error('Error parsing image URL:', imageUrl, e);
             return null;
@@ -34,20 +28,13 @@ const getCorrectImageUrl = (imageUrl) => {
     }
 
     // If it's just a filename, construct the full URL
-    const finalUrl = `https://ayuras.life/uploads/expectations/${imageUrl}`;
-    console.log('Constructed URL from filename:', imageUrl, 'to:', finalUrl);
-    return finalUrl;
+    return `https://ayuras.life/uploads/expectations/${imageUrl}`;
 };
 
-// REMOVED: testImageAccess function that was causing CORS issues
-
 api.interceptors.response.use(
-    (response) => {
-        console.log('API Response:', response.config.url, response.status);
-        return response;
-    },
+    (response) => response,
     (error) => {
-        console.error('API Error:', error.config?.url, error.response?.status, error.message);
+        console.error('API Error:', error);
         return Promise.reject(error);
     }
 );
@@ -66,29 +53,16 @@ const ExpectationsPanel = () => {
     const fetchItems = async () => {
         try {
             setLoading(true);
-            console.log('Fetching expectations...');
             const res = await api.get('/expectations');
-            console.log('Raw API response:', res.data);
 
-            // Process items with correct URLs - REMOVED accessibility testing
-            const processedItems = res.data.map((item) => {
-                const correctedUrl = getCorrectImageUrl(item.image);
+            const processedItems = res.data.map((item) => ({
+                ...item,
+                image: getCorrectImageUrl(item.image)
+            }));
 
-                return {
-                    ...item,
-                    image: correctedUrl
-                };
-            });
-
-            console.log('Processed items:', processedItems);
             setItems(processedItems);
         } catch (error) {
             console.error('Error fetching expectations:', error);
-            console.error('Error details:', {
-                message: error.message,
-                status: error.response?.status,
-                data: error.response?.data
-            });
         } finally {
             setLoading(false);
         }
@@ -117,7 +91,6 @@ const ExpectationsPanel = () => {
 
         if (formData.image) {
             form.append('image', formData.image);
-            console.log('Uploading file:', formData.image.name, 'Size:', formData.image.size);
         }
 
         try {
@@ -125,18 +98,15 @@ const ExpectationsPanel = () => {
             let response;
 
             if (editId) {
-                console.log('Updating expectation:', editId);
                 response = await api.put(`/expectations/${editId}`, form, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             } else {
-                console.log('Creating new expectation');
                 response = await api.post('/expectations', form, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             }
 
-            console.log('Save response:', response.data);
             fetchItems();
             closeModal();
         } catch (error) {
@@ -148,7 +118,6 @@ const ExpectationsPanel = () => {
     };
 
     const handleEdit = (item) => {
-        console.log('Editing item:', item);
         setFormData({
             title: item.title,
             description: item.description,
@@ -163,7 +132,6 @@ const ExpectationsPanel = () => {
 
         try {
             setLoading(true);
-            console.log('Deleting expectation:', id);
             await api.delete(`/expectations/${id}`);
             fetchItems();
         } catch (error) {
@@ -182,39 +150,13 @@ const ExpectationsPanel = () => {
 
     const handleImageError = (e) => {
         console.error('Image failed to load:', e.target.src);
-
-        // Try the direct route if main route fails
-        const originalSrc = e.target.src;
-        if (originalSrc.includes('/uploads/expectations/') && !originalSrc.includes('/test-image/')) {
-            const filename = originalSrc.split('/').pop();
-            const directUrl = `https://ayuras.life/uploads/expectations/${filename}`;
-            console.log('Trying direct URL:', directUrl);
-
-            // Set a flag to prevent infinite loops
-            if (!e.target.dataset.retried) {
-                e.target.dataset.retried = 'true';
-                e.target.src = directUrl;
-                return;
-            }
-        }
-
         e.target.onerror = null;
         e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
-    };
-
-    const handleImageLoad = (e) => {
-        console.log('Image loaded successfully:', e.target.src);
     };
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            console.log('Selected file:', {
-                name: file.name,
-                size: file.size,
-                type: file.type
-            });
-
             const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
             if (!allowedTypes.includes(file.type)) {
                 alert('Please select a valid image file (JPEG, JPG, PNG)');
@@ -263,12 +205,8 @@ const ExpectationsPanel = () => {
                                     alt={item.title}
                                     className="w-full h-48 object-cover rounded-lg"
                                     onError={handleImageError}
-                                    onLoad={handleImageLoad}
                                     crossOrigin="anonymous"
                                 />
-                                <p className="text-xs text-gray-500 mt-1 break-all">
-                                    URL: {item.image}
-                                </p>
                             </div>
                         )}
 
@@ -298,7 +236,6 @@ const ExpectationsPanel = () => {
                 </div>
             )}
 
-            {/* Modal */}
             {modalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-lg p-6 w-full max-w-md">
