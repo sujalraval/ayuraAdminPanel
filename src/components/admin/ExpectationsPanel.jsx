@@ -2,6 +2,12 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 
+// ✅ Axios instance with production baseURL
+const api = axios.create({
+    baseURL: process.env.REACT_APP_API_URL || 'https://ayuras.life/api/v1',
+    withCredentials: true
+});
+
 const ExpectationsPanel = () => {
     const [items, setItems] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
@@ -16,7 +22,7 @@ const ExpectationsPanel = () => {
     const fetchItems = async () => {
         try {
             setLoading(true);
-            const res = await axios.get('/expectations');
+            const res = await api.get('/expectations');
             setItems(res.data);
         } catch (error) {
             console.error('Error fetching expectations:', error);
@@ -50,11 +56,11 @@ const ExpectationsPanel = () => {
         try {
             setLoading(true);
             if (editId) {
-                await axios.put(`/expectations/${editId}`, form, {
+                await api.put(`/expectations/${editId}`, form, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             } else {
-                await axios.post('/expectations', form, {
+                await api.post('/expectations', form, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             }
@@ -79,13 +85,11 @@ const ExpectationsPanel = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this expectation?')) {
-            return;
-        }
+        if (!window.confirm('Are you sure you want to delete this expectation?')) return;
 
         try {
             setLoading(true);
-            await axios.delete(`/expectations/${id}`);
+            await api.delete(`/expectations/${id}`);
             fetchItems();
         } catch (error) {
             console.error('Error deleting expectation:', error);
@@ -96,11 +100,7 @@ const ExpectationsPanel = () => {
     };
 
     const closeModal = () => {
-        setFormData({
-            title: '',
-            description: '',
-            image: null
-        });
+        setFormData({ title: '', description: '', image: null });
         setEditId(null);
         setModalOpen(false);
     };
@@ -113,7 +113,6 @@ const ExpectationsPanel = () => {
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            // Validate file type
             const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
             if (!allowedTypes.includes(file.type)) {
                 alert('Please select a valid image file (JPEG, JPG, PNG)');
@@ -121,7 +120,6 @@ const ExpectationsPanel = () => {
                 return;
             }
 
-            // Validate file size (10MB)
             if (file.size > 10 * 1024 * 1024) {
                 alert('File size must be less than 10MB');
                 e.target.value = '';
@@ -188,12 +186,8 @@ const ExpectationsPanel = () => {
                                 </div>
                             </div>
                             <div className="p-4">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                                    {item.title}
-                                </h3>
-                                <p className="text-gray-600 text-sm line-clamp-3">
-                                    {item.description}
-                                </p>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">{item.title}</h3>
+                                <p className="text-gray-600 text-sm line-clamp-3">{item.description}</p>
                             </div>
                         </div>
                     ))}
@@ -205,19 +199,14 @@ const ExpectationsPanel = () => {
                     </div>
                 )}
 
-                {/* Modal */}
                 {modalOpen && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                         <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
                             <div className="p-6">
-                                <h2 className="text-xl font-bold mb-4">
-                                    {editId ? 'Edit Expectation' : 'Add New Expectation'}
-                                </h2>
+                                <h2 className="text-xl font-bold mb-4">{editId ? 'Edit Expectation' : 'Add New Expectation'}</h2>
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Title *
-                                        </label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
                                         <input
                                             type="text"
                                             value={formData.title}
@@ -228,9 +217,7 @@ const ExpectationsPanel = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Description *
-                                        </label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
                                         <textarea
                                             value={formData.description}
                                             onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -251,9 +238,7 @@ const ExpectationsPanel = () => {
                                             className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             required={!editId}
                                         />
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            Max file size: 10MB. Supported formats: JPEG, JPG, PNG
-                                        </p>
+                                        <p className="text-xs text-gray-500 mt-1">Max file size: 10MB. Supported formats: JPEG, JPG, PNG</p>
                                     </div>
                                     <div className="flex gap-3 pt-4">
                                         <button
