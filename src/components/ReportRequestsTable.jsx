@@ -11,9 +11,9 @@ const ReportRequestsTable = () => {
     const [debugInfo, setDebugInfo] = useState(null);
     const navigate = useNavigate();
 
-    // Create axios instance with base URL
+    // Create axios instance with production base URL
     const api = axios.create({
-        baseURL: process.env.REACT_APP_API_BASE_URL || 'https://ayuras.life/api/v1',
+        baseURL: 'https://ayuras.life/api/v1',
         withCredentials: true,
         timeout: 15000
     });
@@ -62,12 +62,11 @@ const ReportRequestsTable = () => {
             }
 
             const res = await api.get('/orders/pending');
-
             const ordersData = res.data?.orders || [];
+
             if (Array.isArray(ordersData)) {
                 setRequests(ordersData);
                 setDebugInfo(res.data?.debug || null);
-
                 if (ordersData.length === 0) {
                     toast.info("No pending orders found");
                 }
@@ -82,27 +81,13 @@ const ReportRequestsTable = () => {
         }
     };
 
-    const fetchAllOrders = async () => {
-        try {
-            const res = await api.get('/orders/all');
-            console.log('All orders response:', res.data);
-
-            if (res.data?.orders) {
-                const statuses = res.data.orders.map(o => o.status);
-                const uniqueStatuses = [...new Set(statuses)];
-                console.log('All statuses:', uniqueStatuses);
-            }
-        } catch (err) {
-            console.error('Failed to fetch all orders:', err);
-            handleApiError(err);
-        }
-    };
-
     const handleApiError = (err) => {
         let errorMessage = "Failed to fetch requests";
 
         if (err.code === 'ECONNABORTED') {
             errorMessage = "Request timed out";
+        } else if (err.code === 'ERR_NETWORK' || err.code === 'NETWORK_ERROR') {
+            errorMessage = "Network error. Please check your connection and try again.";
         } else if (err.response?.status === 401) {
             errorMessage = "Session expired. Please log in again.";
             localStorage.removeItem('adminToken');
@@ -127,9 +112,9 @@ const ReportRequestsTable = () => {
 
             toast.success(`Order ${action === 'deny' ? 'denied' : 'approved'}`);
             await fetchRequests(); // Refresh list
-
         } catch (err) {
-            toast.error(err.response?.data?.message || `Failed to ${action} order`);
+            const errorMessage = err.response?.data?.message || `Failed to ${action} order`;
+            toast.error(errorMessage);
             handleApiError(err);
         }
     };
@@ -142,6 +127,7 @@ const ReportRequestsTable = () => {
             navigate('/admin/login');
             return;
         }
+
         fetchRequests();
     }, []);
 
@@ -150,12 +136,15 @@ const ReportRequestsTable = () => {
         try {
             const birthDate = new Date(dob);
             if (isNaN(birthDate.getTime())) return 'N/A';
+
             const today = new Date();
             let age = today.getFullYear() - birthDate.getFullYear();
             const monthDiff = today.getMonth() - birthDate.getMonth();
+
             if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
                 age--;
             }
+
             return age >= 0 ? age : 'N/A';
         } catch (error) {
             return 'N/A';
@@ -193,189 +182,163 @@ const ReportRequestsTable = () => {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center p-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                <span className="ml-3 text-gray-600">Loading pending requests...</span>
+            <div className="flex justify-center items-center min-h-screen">
+                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="p-8 text-center">
-                <div className="text-red-600 mb-4 text-lg">⚠️ {error}</div>
-                {error.includes('log in') ? (
-                    <button
-                        onClick={() => navigate('/admin/login')}
-                        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                        🔄 Go to Login
-                    </button>
-                ) : (
-                    <>
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6">
+                    <div className="text-center">
+                        <div className="text-red-500 text-xl mb-4">⚠️</div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">Error</h3>
+                        <p className="text-gray-600 mb-4">{error}</p>
                         <button
                             onClick={fetchRequests}
-                            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mr-4"
+                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                         >
-                            🔄 Retry Loading
+                            Retry
                         </button>
-                    </>
-                )}
+                    </div>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="container mx-auto p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">
-                    Pending Report Requests ({requests.length})
-                </h2>
-                <div className="flex gap-2">
-                    <button
-                        onClick={fetchRequests}
-                        className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-                    >
-                        🔄 Refresh
-                    </button>
-                </div>
-            </div>
-
-            {requests.length === 0 ? (
-                <div className="text-center py-12 bg-gray-50 rounded-lg">
-                    <div className="text-gray-500 text-lg mb-2">✅ No pending requests found</div>
-                    <div className="text-gray-400 text-sm mb-4">All orders have been processed</div>
+        <div className="container mx-auto px-4 py-8">
+            <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+                <div className="px-6 py-4 bg-gray-50 border-b">
+                    <h2 className="text-xl font-semibold text-gray-800">Pending Order Requests</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                        {requests.length} pending order{requests.length !== 1 ? 's' : ''} found
+                    </p>
 
                     {debugInfo && (
-                        <div className="text-xs text-gray-500">
+                        <div className="mt-2 text-xs text-gray-500">
                             <p>Database contains {debugInfo.totalOrdersInDB} total orders</p>
                             <p>Available statuses: {debugInfo.allStatuses?.join(', ')}</p>
                         </div>
                     )}
-
-                    <button
-                        onClick={() => {
-                            console.log('📊 Checking all orders...');
-                            fetchAllOrders();
-                        }}
-                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                        Check All Orders
-                    </button>
                 </div>
-            ) : (
-                <div className="grid gap-6">
-                    {requests.map((request) => (
-                        <div key={request._id} className="bg-white rounded-lg shadow-lg p-6 border border-gray-200 hover:shadow-xl transition-shadow">
-                            {/* Header */}
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="text-lg font-semibold text-gray-800">
-                                        Order ID: {request._id}
-                                    </h3>
-                                    <p className="text-sm text-gray-500">
-                                        Created: {formatDate(request.createdAt)}
-                                    </p>
-                                    <p className="text-sm text-gray-600">
-                                        Status: <span className="font-medium text-orange-600">{request.status}</span>
-                                    </p>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => handleAction(request._id, 'approve')}
-                                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-1"
-                                    >
-                                        ✅ Approve
-                                    </button>
-                                    <button
-                                        onClick={() => handleAction(request._id, 'deny')}
-                                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1"
-                                    >
-                                        ❌ Deny
-                                    </button>
-                                </div>
-                            </div>
 
-                            {/* Patient Information */}
-                            <div className="grid md:grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <h4 className="font-semibold text-gray-700 mb-2">👤 Patient Information</h4>
-                                    <div className="space-y-1 text-sm">
-                                        <p><span className="font-medium">Name:</span> {request.patientInfo?.name || 'N/A'}</p>
-                                        <p><span className="font-medium">Age:</span> {calculateAge(request.patientInfo?.dob)}</p>
-                                        <p><span className="font-medium">Gender:</span> {request.patientInfo?.gender || 'N/A'}</p>
-                                        <p><span className="font-medium">Email:</span> {request.patientInfo?.email || 'N/A'}</p>
-                                        <p><span className="font-medium">Phone:</span> {request.patientInfo?.phone || 'N/A'}</p>
-                                        <p><span className="font-medium">Relation:</span> {request.patientInfo?.relation || 'N/A'}</p>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <h4 className="font-semibold text-gray-700 mb-2">📋 Order Details</h4>
-                                    <div className="space-y-1 text-sm">
-                                        <p><span className="font-medium">Status:</span>
-                                            <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
-                                                {request.status}
-                                            </span>
-                                        </p>
-                                        <p><span className="font-medium">Payment:</span> {request.paymentMethod || 'N/A'}</p>
-                                        <p><span className="font-medium">Total:</span> {getTotalPrice(request.totalPrice)}</p>
-                                        <p><span className="font-medium">Time Slot:</span> {request.patientInfo?.timeSlot || 'Not set'}</p>
-                                        <p><span className="font-medium">Payment Status:</span> {request.paymentStatus || 'N/A'}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Address */}
-                            <div className="mb-4">
-                                <h4 className="font-semibold text-gray-700 mb-1">📍 Address</h4>
-                                <p className="text-sm text-gray-600">
-                                    {[
-                                        request.patientInfo?.address,
-                                        request.patientInfo?.city,
-                                        request.patientInfo?.state,
-                                        request.patientInfo?.pincode
-                                    ].filter(Boolean).join(', ') || 'No address provided'}
-                                </p>
-                            </div>
-
-                            {/* Tests */}
-                            <div>
-                                <h4 className="font-semibold text-gray-700 mb-2">🧪 Requested Tests</h4>
-                                <div className="bg-gray-50 p-3 rounded">
-                                    <p className="text-sm font-medium">{getTestNames(request.cartItems)}</p>
-                                    {Array.isArray(request.cartItems) && request.cartItems.length > 0 && (
-                                        <>
-                                            <div className="mt-2 text-xs text-gray-500">
-                                                Test count: {request.cartItems.length} |
-                                                Labs: {[...new Set(request.cartItems.map(item => item.lab))].join(', ')}
+                {requests.length === 0 ? (
+                    <div className="text-center py-12">
+                        <div className="text-gray-400 text-6xl mb-4">📋</div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Pending Requests</h3>
+                        <p className="text-gray-600">All orders have been processed</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Order Details
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Patient Info
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Tests & Payment
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Address & Schedule
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {requests.map((request) => (
+                                    <tr key={request._id} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm">
+                                                <div className="font-medium text-gray-900">#{request._id?.slice(-8)}</div>
+                                                <div className="text-gray-500">Created: {formatDate(request.createdAt)}</div>
+                                                <div className="text-gray-500">Status: {request.status}</div>
                                             </div>
-                                            <div className="mt-2 space-y-1">
-                                                {request.cartItems.map((item, index) => (
-                                                    <div key={index} className="text-xs text-gray-600 flex justify-between">
-                                                        <span>{item.testName} ({item.lab})</span>
-                                                        <span>₹{item.price}</span>
+                                        </td>
+
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm">
+                                                <div className="font-medium text-gray-900">Name: {request.patientInfo?.name || 'N/A'}</div>
+                                                <div className="text-gray-500">Age: {calculateAge(request.patientInfo?.dob)}</div>
+                                                <div className="text-gray-500">Gender: {request.patientInfo?.gender || 'N/A'}</div>
+                                                <div className="text-gray-500">Email: {request.patientInfo?.email || 'N/A'}</div>
+                                                <div className="text-gray-500">Phone: {request.patientInfo?.phone || 'N/A'}</div>
+                                                <div className="text-gray-500">Relation: {request.patientInfo?.relation || 'N/A'}</div>
+                                            </div>
+                                        </td>
+
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm">
+                                                <div className="font-medium text-gray-900">Status: {request.status}</div>
+                                                <div className="text-gray-500">Payment: {request.paymentMethod || 'N/A'}</div>
+                                                <div className="text-gray-500">Total: {getTotalPrice(request.totalPrice)}</div>
+                                                <div className="text-gray-500">Time Slot: {request.patientInfo?.timeSlot || 'Not set'}</div>
+                                                <div className="text-gray-500">Payment Status: {request.paymentStatus || 'N/A'}</div>
+                                            </div>
+                                        </td>
+
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm">
+                                                <div className="text-gray-900 max-w-xs">
+                                                    {[
+                                                        request.patientInfo?.address,
+                                                        request.patientInfo?.city,
+                                                        request.patientInfo?.state,
+                                                        request.patientInfo?.pincode
+                                                    ].filter(Boolean).join(', ') || 'No address provided'}
+                                                </div>
+                                                <div className="mt-2 text-gray-600">
+                                                    <div className="font-medium">Tests:</div>
+                                                    <div>{getTestNames(request.cartItems)}</div>
+                                                    {Array.isArray(request.cartItems) && request.cartItems.length > 0 && (
+                                                        <div className="mt-1">
+                                                            {request.cartItems.map((item, index) => (
+                                                                <div key={index} className="text-xs text-gray-500">
+                                                                    {item.testName || item.name} - ₹{item.price}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {request.technicianNotes && (
+                                                    <div className="mt-2 text-xs text-gray-500">
+                                                        Notes: {request.technicianNotes}
                                                     </div>
-                                                ))}
+                                                )}
                                             </div>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
+                                        </td>
 
-                            {/* Technician Notes (if any) */}
-                            {request.technicianNotes && (
-                                <div className="mt-4">
-                                    <h4 className="font-semibold text-gray-700 mb-1">📝 Notes</h4>
-                                    <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                                        {request.technicianNotes}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            <div className="flex space-x-2">
+                                                <button
+                                                    onClick={() => handleAction(request._id, 'approve')}
+                                                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs transition-colors"
+                                                >
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    onClick={() => handleAction(request._id, 'deny')}
+                                                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs transition-colors"
+                                                >
+                                                    Deny
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

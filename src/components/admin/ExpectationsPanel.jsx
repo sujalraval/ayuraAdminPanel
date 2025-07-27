@@ -4,7 +4,7 @@ import { Plus, Edit2, Trash2, Eye } from 'lucide-react';
 
 // Enhanced API configuration with better error handling
 const api = axios.create({
-    baseURL: process.env.REACT_APP_API_URL || 'https://ayuras.life/api/v1',
+    baseURL: 'https://ayuras.life/api/v1',
     withCredentials: true,
     timeout: 30000, // 30 seconds timeout
     headers: {

@@ -24,7 +24,12 @@ function Working() {
 
     const getAuthHeaders = () => {
         const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
-        return token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+        return token ? {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        } : {
+            'Content-Type': 'application/json'
+        };
     };
 
     useEffect(() => {
@@ -33,8 +38,12 @@ function Working() {
                 setLoading(true);
                 setError(null);
 
-                const res = await axios.get('http://localhost:5000/api/v1/orders/working', {
-                    headers: getAuthHeaders()
+                // Use production API URL
+                const apiUrl = 'https://ayuras.life/api/v1';
+
+                const res = await axios.get(`${apiUrl}/orders/working`, {
+                    headers: getAuthHeaders(),
+                    timeout: 10000
                 });
 
                 const orders = res.data.orders || [];
@@ -60,9 +69,14 @@ function Working() {
                 setRequests(transformed);
             } catch (err) {
                 console.error('Failed to fetch working orders:', err);
-                setError(err.response?.data?.message || 'Failed to fetch working orders');
-                if (err.response?.status === 401) {
+
+                if (err.code === 'ERR_NETWORK' || err.code === 'NETWORK_ERROR') {
+                    setError("Network error. Please check your connection and try again.");
+                } else if (err.response?.status === 401) {
+                    setError("Session expired. Please log in again.");
                     window.location.href = '/admin/login';
+                } else {
+                    setError(err.response?.data?.message || 'Failed to fetch working orders');
                 }
             } finally {
                 setLoading(false);
@@ -78,7 +92,6 @@ function Working() {
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();
         const monthDiff = today.getMonth() - birthDate.getMonth();
-
         if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
             age--;
         }
@@ -109,22 +122,28 @@ function Working() {
         }
 
         try {
+            const apiUrl = 'https://ayuras.life/api/v1';
+
             const response = await axios.put(
-                `http://localhost:5000/api/v1/orders/${selectedEntry.id}/status`,
+                `${apiUrl}/orders/${selectedEntry.id}/status`,
                 {
                     status: tempStatus.toLowerCase(),
                     notes: `Status updated to ${tempStatus} by admin`
                 },
-                { headers: getAuthHeaders() }
+                {
+                    headers: getAuthHeaders(),
+                    timeout: 10000
+                }
             );
 
             if (response.data.success || response.status === 200) {
                 setRequests((prev) =>
                     prev.map((req) =>
-                        req.id === selectedEntry.id ? { ...req, status: tempStatus.toLowerCase() } : req
+                        req.id === selectedEntry.id
+                            ? { ...req, status: tempStatus.toLowerCase() }
+                            : req
                     )
                 );
-
                 setSelectedEntry((prev) => ({ ...prev, status: tempStatus.toLowerCase() }));
                 alert('Status updated successfully!');
             }
@@ -202,8 +221,10 @@ function Working() {
             const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
             const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
+            const apiUrl = 'https://ayuras.life/api/v1';
+
             const response = await axios.post(
-                `http://localhost:5000/api/v1/orders/upload-report/${selectedEntry.id}`,
+                `${apiUrl}/orders/upload-report/${selectedEntry.id}`,
                 formData,
                 {
                     headers,
@@ -219,11 +240,14 @@ function Working() {
                 setRequests((prev) =>
                     prev.map((req) =>
                         req.id === selectedEntry.id
-                            ? { ...req, reportFile: response.data.reportUrl || 'uploaded', status: 'report submitted' }
+                            ? {
+                                ...req,
+                                reportFile: response.data.reportUrl || 'uploaded',
+                                status: 'report submitted'
+                            }
                             : req
                     )
                 );
-
                 alert('PDF report uploaded successfully!');
                 closeModal();
             }
@@ -232,7 +256,7 @@ function Working() {
 
             let errorMessage = 'Failed to upload PDF report.';
 
-            if (error.code === 'NETWORK_ERROR') {
+            if (error.code === 'NETWORK_ERROR' || error.code === 'ERR_NETWORK') {
                 errorMessage = 'Network error. Please check your connection.';
             } else if (error.response) {
                 if (error.response.status === 500) {
@@ -291,7 +315,7 @@ function Working() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
+            <div className="flex justify-center items-center min-h-screen">
                 <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
             </div>
         );
@@ -299,201 +323,240 @@ function Working() {
 
     if (error) {
         return (
-            <div className="text-center py-8">
-                <div className="text-red-600 text-lg">Error: {error}</div>
-                <button
-                    onClick={() => window.location.reload()}
-                    className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                    Retry
-                </button>
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6">
+                    <div className="text-center">
+                        <div className="text-red-500 text-xl mb-4">⚠️</div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">Error</h3>
+                        <p className="text-gray-600 mb-4">{error}</p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="container mx-auto p-4">
-            <h1 className="text-2xl font-bold mb-6">Working Orders</h1>
+        <div className="container mx-auto px-4 py-8">
+            <h1 className="text-2xl font-bold mb-6">Working Orders Management</h1>
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full bg-white border border-gray-200">
-                    <thead>
-                        <tr className="bg-gray-50">
-                            <th className="px-4 py-2 border-b text-left">Report No</th>
-                            <th className="px-4 py-2 border-b text-left">Patient Name</th>
-                            <th className="px-4 py-2 border-b text-left">Tests</th>
-                            <th className="px-4 py-2 border-b text-left">Amount</th>
-                            <th className="px-4 py-2 border-b text-left">Phlebotomist</th>
-                            <th className="px-4 py-2 border-b text-left">Status</th>
-                            <th className="px-4 py-2 border-b text-left">Report</th>
-                            <th className="px-4 py-2 border-b text-left">Date</th>
-                            <th className="px-4 py-2 border-b text-left">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {requests.length === 0 ? (
+            <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full table-auto">
+                        <thead className="bg-gray-50">
                             <tr>
-                                <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
-                                    No working orders found
-                                </td>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Report No</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient Name</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tests</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phlebotomist</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Report</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
-                        ) : (
-                            requests.map((entry) => (
-                                <tr key={entry.id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-2 border-b">{entry.reportNo}</td>
-                                    <td className="px-4 py-2 border-b">{entry.patientName}</td>
-                                    <td className="px-4 py-2 border-b">
-                                        {entry.tests.length > 0 ? entry.tests.join(', ') : 'No tests'}
-                                    </td>
-                                    <td className="px-4 py-2 border-b">{entry.amount}</td>
-                                    <td className="px-4 py-2 border-b">{entry.phlebotomist}</td>
-                                    <td className="px-4 py-2 border-b">
-                                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(entry.status)}`}>
-                                            {entry.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-2 border-b">
-                                        {entry.reportFile ? (
-                                            <span className="text-green-600">PDF Uploaded</span>
-                                        ) : (
-                                            <span className="text-gray-500">No PDF file</span>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-2 border-b">
-                                        {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString() : 'N/A'}
-                                    </td>
-                                    <td className="px-4 py-2 border-b">
-                                        <button
-                                            onClick={() => openModal(entry)}
-                                            className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
-                                        >
-                                            Manage
-                                        </button>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {requests.length === 0 ? (
+                                <tr>
+                                    <td colSpan="9" className="px-6 py-8 text-center text-gray-500">
+                                        No working orders found
                                     </td>
                                 </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                            ) : (
+                                requests.map((entry) => (
+                                    <tr key={entry.id} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            {entry.reportNo}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.patientName}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-900">
+                                            {entry.tests.length > 0 ? entry.tests.join(', ') : 'No tests'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.amount}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.phlebotomist}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(entry.status)}`}>
+                                                {entry.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.reportFile ? (
+                                                <a
+                                                    href={entry.reportFile}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-green-600 hover:text-green-900"
+                                                >
+                                                    📄 PDF Uploaded
+                                                </a>
+                                            ) : (
+                                                <span className="text-gray-500">No PDF file</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString() : 'N/A'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            <button
+                                                onClick={() => openModal(entry)}
+                                                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs transition-colors"
+                                            >
+                                                Manage
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* Modal */}
             {isModalOpen && selectedEntry && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold">Manage Order</h2>
-                            <button
-                                onClick={closeModal}
-                                className="text-gray-500 hover:text-gray-700 text-xl"
-                            >
-                                ×
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 mb-6">
-                            <div>
-                                <strong>Name:</strong> {selectedEntry.patientName}
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-90vh overflow-y-auto">
+                        <div className="p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-bold text-gray-900">
+                                    Manage Order - {selectedEntry.patientName}
+                                </h2>
+                                <button
+                                    onClick={closeModal}
+                                    className="text-gray-400 hover:text-gray-600"
+                                >
+                                    ✕
+                                </button>
                             </div>
-                            <div>
-                                <strong>Age:</strong> {selectedEntry.age}
-                            </div>
-                            <div>
-                                <strong>Gender:</strong> {selectedEntry.gender}
-                            </div>
-                            <div>
-                                <strong>Phone:</strong> {selectedEntry.phone}
-                            </div>
-                            <div>
-                                <strong>Email:</strong> {selectedEntry.email}
-                            </div>
-                            <div>
-                                <strong>Amount:</strong> {selectedEntry.amount}
-                            </div>
-                        </div>
 
-                        <div className="mb-4">
-                            <strong>Current Status:</strong>
-                            <span className={`ml-2 px-2 py-1 rounded-full text-xs ${getStatusColor(selectedEntry.status)}`}>
-                                {selectedEntry.status}
-                            </span>
-                        </div>
-
-                        <div className="mb-4">
-                            <strong>Tests:</strong>
-                            <div>{selectedEntry.tests.join(', ')}</div>
-                        </div>
-
-                        <div className="mb-4">
-                            <strong>Address:</strong>
-                            <div>{selectedEntry.address}</div>
-                        </div>
-
-                        {/* Status Update */}
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium mb-2">Update Status:</label>
-                            <select
-                                value={tempStatus}
-                                onChange={(e) => setTempStatus(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded"
-                            >
-                                <option value="">Select Status</option>
-                                {statusOptions.map((status) => (
-                                    <option key={status} value={status}>
-                                        {status}
-                                    </option>
-                                ))}
-                            </select>
-                            <button
-                                onClick={updateStatus}
-                                className="mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                            >
-                                Update Status
-                            </button>
-                        </div>
-
-                        {/* File Upload */}
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium mb-2">Upload Report:</label>
-                            <input
-                                type="file"
-                                accept=".pdf"
-                                onChange={handleFileUpload}
-                                className="w-full p-2 border border-gray-300 rounded"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">
-                                <strong>PDF files only</strong> (Maximum 10MB)
-                            </p>
-
-                            {uploadError && (
-                                <div className="text-red-600 text-sm mt-2">{uploadError}</div>
-                            )}
-
-                            {uploadedFile && (
-                                <div className="mt-2 flex items-center justify-between bg-gray-100 p-2 rounded">
-                                    <span className="text-sm">
-                                        {typeof uploadedFile === 'string' ? 'Report uploaded' : uploadedFile.name}
-                                    </span>
-                                    {typeof uploadedFile !== 'string' && (
-                                        <button
-                                            onClick={handleRemoveFile}
-                                            className="text-red-500 hover:text-red-700 text-sm"
-                                        >
-                                            Remove
-                                        </button>
-                                    )}
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div>
+                                    <p className="text-sm text-gray-600">Report No</p>
+                                    <p className="font-medium">{selectedEntry.reportNo}</p>
                                 </div>
-                            )}
+                                <div>
+                                    <p className="text-sm text-gray-600">Patient Name</p>
+                                    <p className="font-medium">{selectedEntry.patientName}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600">Age</p>
+                                    <p className="font-medium">{selectedEntry.age}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600">Gender</p>
+                                    <p className="font-medium">{selectedEntry.gender}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600">Phone</p>
+                                    <p className="font-medium">{selectedEntry.phone}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600">Email</p>
+                                    <p className="font-medium">{selectedEntry.email}</p>
+                                </div>
+                            </div>
 
-                            {uploadedFile && typeof uploadedFile !== 'string' && (
+                            <div className="mb-6">
+                                <p className="text-sm text-gray-600 mb-2">Address</p>
+                                <p className="font-medium">{selectedEntry.address}</p>
+                            </div>
+
+                            <div className="mb-6">
+                                <p className="text-sm text-gray-600 mb-2">Tests</p>
+                                <p className="font-medium">{selectedEntry.tests.join(', ') || 'No tests'}</p>
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Update Status
+                                </label>
+                                <select
+                                    value={tempStatus}
+                                    onChange={(e) => setTempStatus(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="">Select Status</option>
+                                    {statusOptions.map((status) => (
+                                        <option key={status} value={status}>
+                                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    onClick={updateStatus}
+                                    className="mt-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors"
+                                >
+                                    Update Status
+                                </button>
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Upload Report (PDF Only)
+                                </label>
+
+                                {uploadError && (
+                                    <div className="mb-2 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
+                                        {uploadError}
+                                    </div>
+                                )}
+
+                                <input
+                                    type="file"
+                                    accept=".pdf"
+                                    onChange={handleFileUpload}
+                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                />
+
+                                <p className="text-xs text-gray-500 mt-1">
+                                    **PDF files only** (Maximum 10MB)
+                                </p>
+
+                                {uploadedFile && (
+                                    <div className="mt-2 p-2 bg-gray-100 rounded flex justify-between items-center">
+                                        <span className="text-sm text-gray-700">
+                                            {typeof uploadedFile === 'string' ? 'Previously uploaded file' : uploadedFile.name}
+                                        </span>
+                                        {typeof uploadedFile !== 'string' && (
+                                            <button
+                                                onClick={handleRemoveFile}
+                                                className="text-red-500 hover:text-red-700 text-sm"
+                                            >
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
                                 <button
                                     onClick={handleSaveReport}
-                                    disabled={uploadLoading}
-                                    className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300"
+                                    disabled={uploadLoading || !uploadedFile || typeof uploadedFile === 'string'}
+                                    className="mt-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded transition-colors"
                                 >
                                     {uploadLoading ? 'Uploading...' : 'Save Report'}
                                 </button>
-                            )}
+                            </div>
+
+                            <div className="flex justify-end space-x-3">
+                                <button
+                                    onClick={closeModal}
+                                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
