@@ -2,30 +2,33 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 
-// ✅ Axios instance with production baseURL
 const api = axios.create({
     baseURL: process.env.REACT_APP_API_URL || 'https://ayuras.life/api/v1',
     withCredentials: true
 });
 
-// Helper function to ensure correct image URL
 const getCorrectImageUrl = (imageUrl) => {
     if (!imageUrl) return null;
 
     // If it's already a full URL, return as is
     if (imageUrl.startsWith('http')) {
-        // But if it's pointing to admin subdomain, fix it to main domain
-        if (imageUrl.includes('admin.ayuras.life')) {
-            return imageUrl.replace('admin.ayuras.life', 'ayuras.life');
+        // Replace any protocol/host combination with current host
+        try {
+            const currentHost = window.location.host;
+            const url = new URL(imageUrl);
+            url.host = currentHost;
+            url.protocol = window.location.protocol;
+            return url.toString();
+        } catch (e) {
+            console.error('Error parsing image URL:', imageUrl, e);
+            return imageUrl;
         }
-        return imageUrl;
     }
 
-    // If it's just a filename, construct the full URL
-    return `https://ayuras.life/uploads/expectations/${imageUrl}`;
+    // If it's just a filename, construct the full URL using current host
+    return `${window.location.protocol}//${window.location.host}/uploads/expectations/${imageUrl}`;
 };
 
-// Add response interceptor to log responses
 api.interceptors.response.use(
     (response) => {
         console.log('API Response:', response.config.url, response.status);
@@ -55,15 +58,13 @@ const ExpectationsPanel = () => {
             const res = await api.get('/expectations');
             console.log('Fetched expectations:', res.data);
 
-            // Log each image URL
-            res.data.forEach((item, index) => {
-                const correctedUrl = getCorrectImageUrl(item.image);
-                console.log(`Item ${index + 1} - ID: ${item._id}, Original: ${item.image}, Corrected: ${correctedUrl}`);
-                // Update the item with corrected URL
-                item.image = correctedUrl;
-            });
+            // Process items with correct URLs
+            const processedItems = res.data.map(item => ({
+                ...item,
+                image: getCorrectImageUrl(item.image)
+            }));
 
-            setItems(res.data);
+            setItems(processedItems);
         } catch (error) {
             console.error('Error fetching expectations:', error);
             console.error('Error details:', {
@@ -196,46 +197,19 @@ const ExpectationsPanel = () => {
         }
     };
 
-    const testImageUrl = async (url) => {
-        try {
-            const response = await fetch(url, { method: 'HEAD' });
-            console.log(`Image test for ${url}:`, response.status, response.ok);
-            return response.ok;
-        } catch (error) {
-            console.error(`Image test failed for ${url}:`, error);
-            return false;
-        }
-    };
-
     return (
         <div className="p-6 bg-gray-50 min-h-screen">
             <div className="max-w-7xl mx-auto">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold text-gray-900">Expectations Management</h1>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => {
-                                // Debug button to test API endpoint
-                                api.get('/debug/uploads').then(res => {
-                                    console.log('Debug info:', res.data);
-                                    alert(JSON.stringify(res.data, null, 2));
-                                }).catch(err => {
-                                    console.error('Debug failed:', err);
-                                });
-                            }}
-                            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
-                        >
-                            Debug
-                        </button>
-                        <button
-                            onClick={() => setModalOpen(true)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                            disabled={loading}
-                        >
-                            <Plus size={20} />
-                            Add Expectation
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => setModalOpen(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                        disabled={loading}
+                    >
+                        <Plus size={20} />
+                        Add Expectation
+                    </button>
                 </div>
 
                 {loading && (
@@ -249,24 +223,15 @@ const ExpectationsPanel = () => {
                         <div key={item._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
                             <div className="relative h-48 bg-gray-200">
                                 {item.image ? (
-                                    <>
-                                        <img
-                                            src={getCorrectImageUrl(item.image)}
-                                            alt={item.title}
-                                            className="w-full h-full object-cover"
-                                            onError={handleImageError}
-                                            onLoad={() => console.log('Image loaded successfully:', getCorrectImageUrl(item.image))}
-                                            loading="lazy"
-                                        />
-                                        <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-                                            <button
-                                                onClick={() => testImageUrl(getCorrectImageUrl(item.image))}
-                                                className="hover:underline"
-                                            >
-                                                Test URL
-                                            </button>
-                                        </div>
-                                    </>
+                                    <img
+                                        src={item.image}
+                                        alt={item.title}
+                                        className="w-full h-full object-cover"
+                                        onError={handleImageError}
+                                        onLoad={() => console.log('Image loaded successfully:', item.image)}
+                                        loading="lazy"
+                                        crossOrigin="anonymous"
+                                    />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-gray-400">
                                         No Image Available
@@ -292,12 +257,9 @@ const ExpectationsPanel = () => {
                             <div className="p-4">
                                 <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">{item.title}</h3>
                                 <p className="text-gray-600 text-sm line-clamp-3">{item.description}</p>
-                                <div className="mt-2 text-xs text-gray-400 break-all">
-                                    ID: {item._id}
-                                </div>
                                 {item.image && (
                                     <div className="mt-1 text-xs text-blue-600 break-all">
-                                        <a href={getCorrectImageUrl(item.image)} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                        <a href={item.image} target="_blank" rel="noopener noreferrer" className="hover:underline">
                                             View Image
                                         </a>
                                     </div>
