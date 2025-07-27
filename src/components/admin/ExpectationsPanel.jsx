@@ -8,6 +8,18 @@ const api = axios.create({
     withCredentials: true
 });
 
+// Add response interceptor to log responses
+api.interceptors.response.use(
+    (response) => {
+        console.log('API Response:', response.config.url, response.status);
+        return response;
+    },
+    (error) => {
+        console.error('API Error:', error.config?.url, error.response?.status, error.message);
+        return Promise.reject(error);
+    }
+);
+
 const ExpectationsPanel = () => {
     const [items, setItems] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
@@ -22,10 +34,23 @@ const ExpectationsPanel = () => {
     const fetchItems = async () => {
         try {
             setLoading(true);
+            console.log('Fetching expectations...');
             const res = await api.get('/expectations');
+            console.log('Fetched expectations:', res.data);
+
+            // Log each image URL
+            res.data.forEach((item, index) => {
+                console.log(`Item ${index + 1} - ID: ${item._id}, Image URL: ${item.image}`);
+            });
+
             setItems(res.data);
         } catch (error) {
             console.error('Error fetching expectations:', error);
+            console.error('Error details:', {
+                message: error.message,
+                status: error.response?.status,
+                data: error.response?.data
+            });
         } finally {
             setLoading(false);
         }
@@ -51,30 +76,43 @@ const ExpectationsPanel = () => {
         const form = new FormData();
         form.append('title', formData.title);
         form.append('description', formData.description);
-        if (formData.image) form.append('image', formData.image);
+        if (formData.image) {
+            form.append('image', formData.image);
+            console.log('Uploading file:', formData.image.name, 'Size:', formData.image.size);
+        }
 
         try {
             setLoading(true);
+            let response;
             if (editId) {
-                await api.put(`/expectations/${editId}`, form, {
+                console.log('Updating expectation:', editId);
+                response = await api.put(`/expectations/${editId}`, form, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             } else {
-                await api.post('/expectations', form, {
+                console.log('Creating new expectation');
+                response = await api.post('/expectations', form, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             }
+            console.log('Save response:', response.data);
             fetchItems();
             closeModal();
         } catch (error) {
             console.error('Error saving expectation:', error);
-            alert('Error saving expectation. Please try again.');
+            console.error('Error details:', {
+                message: error.message,
+                status: error.response?.status,
+                data: error.response?.data
+            });
+            alert(`Error saving expectation: ${error.response?.data?.error || error.message}`);
         } finally {
             setLoading(false);
         }
     };
 
     const handleEdit = (item) => {
+        console.log('Editing item:', item);
         setFormData({
             title: item.title,
             description: item.description,
@@ -89,11 +127,12 @@ const ExpectationsPanel = () => {
 
         try {
             setLoading(true);
+            console.log('Deleting expectation:', id);
             await api.delete(`/expectations/${id}`);
             fetchItems();
         } catch (error) {
             console.error('Error deleting expectation:', error);
-            alert('Error deleting expectation. Please try again.');
+            alert(`Error deleting expectation: ${error.response?.data?.error || error.message}`);
         } finally {
             setLoading(false);
         }
@@ -106,13 +145,20 @@ const ExpectationsPanel = () => {
     };
 
     const handleImageError = (e) => {
+        console.error('Image failed to load:', e.target.src);
         e.target.onerror = null;
-        e.target.src = '/placeholder-image.jpg';
+        e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
     };
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
+            console.log('Selected file:', {
+                name: file.name,
+                size: file.size,
+                type: file.type
+            });
+
             const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
             if (!allowedTypes.includes(file.type)) {
                 alert('Please select a valid image file (JPEG, JPG, PNG)');
@@ -130,19 +176,46 @@ const ExpectationsPanel = () => {
         }
     };
 
+    const testImageUrl = async (url) => {
+        try {
+            const response = await fetch(url, { method: 'HEAD' });
+            console.log(`Image test for ${url}:`, response.status, response.ok);
+            return response.ok;
+        } catch (error) {
+            console.error(`Image test failed for ${url}:`, error);
+            return false;
+        }
+    };
+
     return (
         <div className="p-6 bg-gray-50 min-h-screen">
             <div className="max-w-7xl mx-auto">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold text-gray-900">Expectations Management</h1>
-                    <button
-                        onClick={() => setModalOpen(true)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                        disabled={loading}
-                    >
-                        <Plus size={20} />
-                        Add Expectation
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => {
+                                // Debug button to test API endpoint
+                                api.get('/debug/uploads').then(res => {
+                                    console.log('Debug info:', res.data);
+                                    alert(JSON.stringify(res.data, null, 2));
+                                }).catch(err => {
+                                    console.error('Debug failed:', err);
+                                });
+                            }}
+                            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+                        >
+                            Debug
+                        </button>
+                        <button
+                            onClick={() => setModalOpen(true)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                            disabled={loading}
+                        >
+                            <Plus size={20} />
+                            Add Expectation
+                        </button>
+                    </div>
                 </div>
 
                 {loading && (
@@ -156,16 +229,27 @@ const ExpectationsPanel = () => {
                         <div key={item._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
                             <div className="relative h-48 bg-gray-200">
                                 {item.image ? (
-                                    <img
-                                        src={item.image}
-                                        alt={item.title}
-                                        className="w-full h-full object-cover"
-                                        onError={handleImageError}
-                                        loading="lazy"
-                                    />
+                                    <>
+                                        <img
+                                            src={item.image}
+                                            alt={item.title}
+                                            className="w-full h-full object-cover"
+                                            onError={handleImageError}
+                                            onLoad={() => console.log('Image loaded successfully:', item.image)}
+                                            loading="lazy"
+                                        />
+                                        <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                                            <button
+                                                onClick={() => testImageUrl(item.image)}
+                                                className="hover:underline"
+                                            >
+                                                Test URL
+                                            </button>
+                                        </div>
+                                    </>
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                        No Image
+                                        No Image Available
                                     </div>
                                 )}
                                 <div className="absolute top-2 right-2 flex gap-2">
@@ -188,6 +272,16 @@ const ExpectationsPanel = () => {
                             <div className="p-4">
                                 <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">{item.title}</h3>
                                 <p className="text-gray-600 text-sm line-clamp-3">{item.description}</p>
+                                <div className="mt-2 text-xs text-gray-400 break-all">
+                                    ID: {item._id}
+                                </div>
+                                {item.image && (
+                                    <div className="mt-1 text-xs text-blue-600 break-all">
+                                        <a href={item.image} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                            View Image
+                                        </a>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -239,6 +333,9 @@ const ExpectationsPanel = () => {
                                             required={!editId}
                                         />
                                         <p className="text-xs text-gray-500 mt-1">Max file size: 10MB. Supported formats: JPEG, JPG, PNG</p>
+                                        {formData.image && (
+                                            <p className="text-xs text-green-600 mt-1">Selected: {formData.image.name}</p>
+                                        )}
                                     </div>
                                     <div className="flex gap-3 pt-4">
                                         <button
