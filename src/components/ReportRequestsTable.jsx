@@ -17,16 +17,14 @@ const ReportRequestsTable = () => {
         timeout: 15000,
     });
 
-    // ✅ Attach token globally via interceptor
+    // Attach token globally via interceptor
     useEffect(() => {
         const requestInterceptor = api.interceptors.request.use(
             config => {
-                const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
-                if (!token) {
-                    navigate('/admin/login');
-                    return Promise.reject(new Error('Not Authenticated'));
+                const token = localStorage.getItem('adminToken');
+                if (token) {
+                    config.headers.Authorization = `Bearer ${token}`;
                 }
-                config.headers.Authorization = `Bearer ${token}`;
                 config.headers['Content-Type'] = 'application/json';
                 return config;
             },
@@ -64,6 +62,7 @@ const ReportRequestsTable = () => {
             setRequests(res.data.orders || []);
         } catch (err) {
             setError('Failed to load orders');
+            console.error('Fetch error:', err);
         } finally {
             setLoading(false);
         }
@@ -72,20 +71,13 @@ const ReportRequestsTable = () => {
     const handleAction = async (orderId, action) => {
         try {
             setActionLoading(orderId);
-            const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
             const endpoint = `/orders/${action === 'deny' ? 'deny' : 'approve'}/${orderId}`;
+
             const response = await api.put(
                 endpoint,
                 {
-                    action,
                     adminNotes: `Order ${action}ed by admin`,
                     actionTimestamp: new Date().toISOString(),
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                    },
                 }
             );
 
@@ -96,7 +88,8 @@ const ReportRequestsTable = () => {
                 toast.error(`Failed to ${action} order`);
             }
         } catch (err) {
-            toast.error(`Error while trying to ${action} order`);
+            console.error('Action error:', err);
+            toast.error(`Error while trying to ${action} order: ${err.response?.data?.message || err.message}`);
         } finally {
             setActionLoading(null);
         }
@@ -142,58 +135,62 @@ const ReportRequestsTable = () => {
             >
                 Refresh
             </button>
-            <table className="min-w-full bg-white border">
-                <thead>
-                    <tr>
-                        <th className="border px-4 py-2">Order</th>
-                        <th className="border px-4 py-2">Patient</th>
-                        <th className="border px-4 py-2">Tests</th>
-                        <th className="border px-4 py-2">Address</th>
-                        <th className="border px-4 py-2">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {requests.map(req => (
-                        <tr key={req._id}>
-                            <td className="border px-4 py-2">
-                                #{req._id.slice(-6)}<br />
-                                {formatDate(req.createdAt)}<br />
-                                <strong>Status:</strong> {req.status}
-                            </td>
-                            <td className="border px-4 py-2">
-                                {req.patientInfo?.name}<br />
-                                Age: {calculateAge(req.patientInfo?.dob)}<br />
-                                Phone: {req.patientInfo?.phone}
-                            </td>
-                            <td className="border px-4 py-2">
-                                {getTestNames(req.cartItems)}<br />
-                                Total: {getTotalPrice(req.totalPrice)}
-                            </td>
-                            <td className="border px-4 py-2">
-                                {[req.patientInfo?.address, req.patientInfo?.city, req.patientInfo?.state, req.patientInfo?.pincode]
-                                    .filter(Boolean)
-                                    .join(', ')}
-                            </td>
-                            <td className="border px-4 py-2">
-                                <button
-                                    onClick={() => handleAction(req._id, 'approve')}
-                                    className="bg-green-500 text-white px-3 py-1 rounded mr-2"
-                                    disabled={actionLoading === req._id}
-                                >
-                                    {actionLoading === req._id ? '⏳' : '✓'} Approve
-                                </button>
-                                <button
-                                    onClick={() => handleAction(req._id, 'deny')}
-                                    className="bg-red-500 text-white px-3 py-1 rounded"
-                                    disabled={actionLoading === req._id}
-                                >
-                                    {actionLoading === req._id ? '⏳' : '✕'} Deny
-                                </button>
-                            </td>
+            {requests.length === 0 ? (
+                <div className="text-center py-10">No pending orders found</div>
+            ) : (
+                <table className="min-w-full bg-white border">
+                    <thead>
+                        <tr>
+                            <th className="border px-4 py-2">Order</th>
+                            <th className="border px-4 py-2">Patient</th>
+                            <th className="border px-4 py-2">Tests</th>
+                            <th className="border px-4 py-2">Address</th>
+                            <th className="border px-4 py-2">Actions</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {requests.map(req => (
+                            <tr key={req._id}>
+                                <td className="border px-4 py-2">
+                                    #{req._id.slice(-6)}<br />
+                                    {formatDate(req.createdAt)}<br />
+                                    <strong>Status:</strong> {req.status}
+                                </td>
+                                <td className="border px-4 py-2">
+                                    {req.patientInfo?.name}<br />
+                                    Age: {calculateAge(req.patientInfo?.dob)}<br />
+                                    Phone: {req.patientInfo?.phone}
+                                </td>
+                                <td className="border px-4 py-2">
+                                    {getTestNames(req.cartItems)}<br />
+                                    Total: {getTotalPrice(req.totalPrice)}
+                                </td>
+                                <td className="border px-4 py-2">
+                                    {[req.patientInfo?.address, req.patientInfo?.city, req.patientInfo?.state, req.patientInfo?.pincode]
+                                        .filter(Boolean)
+                                        .join(', ')}
+                                </td>
+                                <td className="border px-4 py-2">
+                                    <button
+                                        onClick={() => handleAction(req._id, 'approve')}
+                                        className="bg-green-500 text-white px-3 py-1 rounded mr-2"
+                                        disabled={actionLoading === req._id}
+                                    >
+                                        {actionLoading === req._id ? '⏳' : '✓'} Approve
+                                    </button>
+                                    <button
+                                        onClick={() => handleAction(req._id, 'deny')}
+                                        className="bg-red-500 text-white px-3 py-1 rounded"
+                                        disabled={actionLoading === req._id}
+                                    >
+                                        {actionLoading === req._id ? '⏳' : '✕'} Deny
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
         </div>
     );
 };
