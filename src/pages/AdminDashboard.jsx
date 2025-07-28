@@ -10,10 +10,44 @@ import LabInsights from './LabInsights';
 import Working from './Working';
 import axios from 'axios';
 
-// Set the base URL for all API requests - fixed to production URL
+// Set base URL for API requests
 axios.defaults.baseURL = 'https://ayuras.life/api/v1';
 
-function AdminDashboard({ admin: propAdmin }) {
+// Define tabs configuration outside the component
+const adminTabs = [
+    {
+        id: 'report-requests',
+        label: 'Report Requests',
+        description: 'Manage pending order requests',
+        allowedRoles: ['admin', 'manager', 'superadmin']
+    },
+    {
+        id: 'working',
+        label: 'Working',
+        description: 'Manage orders in progress',
+        allowedRoles: ['admin', 'labtech', 'manager', 'superadmin']
+    },
+    {
+        id: 'previous-reports',
+        label: 'Previous Reports',
+        description: 'View uploaded reports',
+        allowedRoles: ['admin', 'labtech', 'manager', 'superadmin']
+    },
+    {
+        id: 'patients',
+        label: 'Patients',
+        description: 'Manage patient data',
+        allowedRoles: ['admin', 'manager', 'superadmin']
+    },
+    {
+        id: 'lab-insights',
+        label: 'Lab Insights',
+        description: 'View analytics and insights',
+        allowedRoles: ['admin', 'manager', 'superadmin']
+    },
+];
+
+const AdminDashboard = ({ admin: propAdmin }) => {
     const [activeTab, setActiveTab] = useState('report-requests');
     const [adminUser, setAdminUser] = useState(null);
     const [error, setError] = useState(null);
@@ -23,13 +57,11 @@ function AdminDashboard({ admin: propAdmin }) {
     useEffect(() => {
         const initializeAdminUser = () => {
             try {
-                // Use admin from props (passed by withAdminAuth HOC) first
                 if (propAdmin) {
                     setAdminUser(propAdmin);
                     return;
                 }
 
-                // Fallback to localStorage
                 const storedUser = localStorage.getItem('adminUser') || localStorage.getItem('adminData');
                 if (storedUser) {
                     const parsedUser = JSON.parse(storedUser);
@@ -51,15 +83,12 @@ function AdminDashboard({ admin: propAdmin }) {
     const handleLogout = async () => {
         try {
             setLoading(true);
-
-            // Optional: Call logout API endpoint
             const token = localStorage.getItem('adminToken');
+
             if (token) {
                 try {
                     await axios.post('/admin/logout', {}, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        },
+                        headers: { 'Authorization': `Bearer ${token}` },
                         timeout: 5000
                     });
                 } catch (logoutError) {
@@ -67,16 +96,13 @@ function AdminDashboard({ admin: propAdmin }) {
                 }
             }
 
-            // Clear all admin-related localStorage items
             localStorage.removeItem('adminToken');
             localStorage.removeItem('adminRole');
             localStorage.removeItem('adminUser');
             localStorage.removeItem('adminData');
 
-            // Clear any axios default headers
             delete axios.defaults.headers.common['Authorization'];
 
-            // Clear cookies by setting expired date
             document.cookie = 'adminToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.ayuras.life';
             document.cookie = 'adminToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 
@@ -86,8 +112,6 @@ function AdminDashboard({ admin: propAdmin }) {
             setError('Error during logout');
             console.error('Logout error:', err);
             toast.error('Error during logout');
-
-            // Force logout even if API call fails
             localStorage.clear();
             navigate('/admin/login');
         } finally {
@@ -99,55 +123,17 @@ function AdminDashboard({ admin: propAdmin }) {
         try {
             setActiveTab(tabId);
             setError(null);
-
-            // Optional: Track tab changes for analytics
-            console.log('Tab changed to:', tabId);
         } catch (err) {
             console.error('Error changing tab:', err);
             toast.error('Error switching tabs');
         }
     };
 
-    const tabs = [
-        {
-            id: 'report-requests',
-            label: 'Report Requests',
-            description: 'Manage pending order requests',
-            allowedRoles: ['admin', 'manager', 'superadmin']
-        },
-        {
-            id: 'working',
-            label: 'Working',
-            description: 'Manage orders in progress',
-            allowedRoles: ['admin', 'labtech', 'manager', 'superadmin']
-        },
-        {
-            id: 'previous-reports',
-            label: 'Previous Reports',
-            description: 'View uploaded reports',
-            allowedRoles: ['admin', 'labtech', 'manager', 'superadmin']
-        },
-        {
-            id: 'patients',
-            label: 'Patients',
-            description: 'Manage patient data',
-            allowedRoles: ['admin', 'manager', 'superadmin']
-        },
-        {
-            id: 'lab-insights',
-            label: 'Lab Insights',
-            description: 'View analytics and insights',
-            allowedRoles: ['admin', 'manager', 'superadmin']
-        },
-    ];
-
-    // Filter tabs based on user role
-    const visibleTabs = tabs.filter(tab => {
-        if (!adminUser || !adminUser.role) return true; // Show all if role not available
+    const visibleTabs = adminTabs.filter(tab => {
+        if (!adminUser || !adminUser.role) return true;
         return tab.allowedRoles.includes(adminUser.role);
     });
 
-    // Set default tab if current tab is not visible to user
     useEffect(() => {
         if (visibleTabs.length > 0 && !visibleTabs.find(tab => tab.id === activeTab)) {
             setActiveTab(visibleTabs[0].id);
@@ -185,7 +171,6 @@ function AdminDashboard({ admin: propAdmin }) {
                 </div>
             )}
 
-            {/* User Info Bar */}
             <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-2">
                 <div className="flex justify-between items-center text-sm text-gray-600">
                     <div>
@@ -202,7 +187,6 @@ function AdminDashboard({ admin: propAdmin }) {
                 </div>
             </div>
 
-            {/* Horizontal Tabs */}
             <div className="border-b border-gray-200 px-4 sm:px-6">
                 <div className="flex overflow-x-auto py-2 space-x-6">
                     {visibleTabs.map((tab) => (
@@ -221,7 +205,6 @@ function AdminDashboard({ admin: propAdmin }) {
                 </div>
             </div>
 
-            {/* Tab Content */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
                 <div className="transition-opacity duration-200">
                     {activeTab === 'report-requests' && <ReportRequests adminUser={adminUser} />}
@@ -232,7 +215,6 @@ function AdminDashboard({ admin: propAdmin }) {
                 </div>
             </div>
 
-            {/* Footer */}
             <footer className="bg-white border-t border-gray-200 mt-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
                     <div className="text-center text-sm text-gray-500">
@@ -242,6 +224,10 @@ function AdminDashboard({ admin: propAdmin }) {
             </footer>
         </div>
     );
-}
+};
 
+// Named export for the component
+export { AdminDashboard };
+
+// Default export with HOC wrapper
 export default withAdminAuth(AdminDashboard, ['admin', 'labtech', 'superadmin', 'manager']);
