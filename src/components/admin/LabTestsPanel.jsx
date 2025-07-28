@@ -126,6 +126,7 @@ const LabTestsPanel = () => {
                         <tr>
                             <th className="px-4 py-2">Name</th>
                             <th className="px-4 py-2">Category</th>
+                            <th className="px-4 py-2">Collection Type</th>
                             <th className="px-4 py-2">Price</th>
                             <th className="px-4 py-2">Status</th>
                             <th className="px-4 py-2">Actions</th>
@@ -136,6 +137,7 @@ const LabTestsPanel = () => {
                             <tr key={test._id} className="border-t">
                                 <td className="px-4 py-2">{test.name}</td>
                                 <td className="px-4 py-2">{test.category || 'None'}</td>
+                                <td className="px-4 py-2">{test.collectionType || '-'}</td>
                                 <td className="px-4 py-2">₹{test.price}</td>
                                 <td className="px-4 py-2 capitalize">{test.status}</td>
                                 <td className="px-4 py-2 flex space-x-2">
@@ -150,7 +152,7 @@ const LabTestsPanel = () => {
                         ))}
                         {labTests.length === 0 && (
                             <tr>
-                                <td colSpan="5" className="px-4 py-4 text-center text-gray-500">
+                                <td colSpan="6" className="px-4 py-4 text-center text-gray-500">
                                     No tests found
                                 </td>
                             </tr>
@@ -162,7 +164,7 @@ const LabTestsPanel = () => {
             {/* Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex justify-center items-center">
-                    <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl relative">
+                    <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl relative max-h-[90vh] overflow-y-auto">
                         <button
                             onClick={closeModal}
                             className="absolute top-2 right-2 text-gray-600 hover:text-red-600"
@@ -184,7 +186,8 @@ const LabTestsPanel = () => {
                                 { label: 'Age Group', name: 'ageGroup', type: 'text' },
                                 { label: 'Gender', name: 'gender', type: 'text' },
                                 { label: 'Price (₹)', name: 'price', type: 'number', required: true },
-                                { label: 'Duration', name: 'duration', type: 'text' }
+                                { label: 'Duration', name: 'duration', type: 'text' },
+                                { label: 'Collection Type', name: 'collectionType', type: 'text' }
                             ].map(({ label, name, type, required }) => (
                                 <div key={name}>
                                     <label className="block text-sm font-medium mb-1">
@@ -229,6 +232,20 @@ const LabTestsPanel = () => {
                                     <option value="inactive">Inactive</option>
                                 </select>
                             </div>
+                        </div>
+
+                        {/* Why It Is Important - Full Width Textarea */}
+                        <div className="mt-4">
+                            <label className="block text-sm font-medium mb-1">
+                                Why It Is Important
+                            </label>
+                            <textarea
+                                name="whyItIsImportant"
+                                className="w-full px-3 py-2 border rounded h-24"
+                                value={formData.whyItIsImportant || ''}
+                                onChange={handleChange}
+                                placeholder="Explain why this test is important..."
+                            />
                         </div>
 
                         <div className="mt-6 flex justify-end gap-2">
