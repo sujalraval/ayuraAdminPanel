@@ -19,7 +19,7 @@ const ProtectedRoute = ({ children, requiredRole = 'admin' }) => {
                 }
 
                 // Verify token with backend
-                const response = await axios.get('http://localhost:5000/api/v1/auth/verify', {
+                const response = await axios.get('https://ayuras.life/api/v1/auth/verify', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
