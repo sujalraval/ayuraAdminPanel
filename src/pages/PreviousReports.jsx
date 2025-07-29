@@ -13,7 +13,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-function PreviousReports() {
+function PreviousReports({ admin }) {
   const [reports, setReports] = useState([]);
   const [filteredReports, setFilteredReports] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -23,10 +23,14 @@ function PreviousReports() {
   const [sortOrder, setSortOrder] = useState('desc');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [authToken, setAuthToken] = useState(null); // No default token - user must authenticate
 
   // Production API configuration
   const API_BASE_URL = 'https://ayuras.life/api/v1';
+
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    return localStorage.getItem('adminToken');
+  };
 
   // Fetch reports from production API
   useEffect(() => {
@@ -38,8 +42,10 @@ function PreviousReports() {
       setLoading(true);
       setError(null);
 
+      const authToken = getAuthToken();
+
       if (!authToken) {
-        throw new Error('No authentication token found');
+        throw new Error('No authentication token found. Please login again.');
       }
 
       const response = await fetch(`${API_BASE_URL}/orders/user`, {
@@ -52,6 +58,11 @@ function PreviousReports() {
 
       if (!response.ok) {
         if (response.status === 401) {
+          // Clear tokens and redirect to login
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminUser');
+          localStorage.removeItem('adminData');
+          localStorage.removeItem('adminRole');
           throw new Error('Authentication failed. Please login again.');
         }
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -92,6 +103,13 @@ function PreviousReports() {
     } catch (err) {
       console.error('Error fetching reports:', err);
       setError(err.message);
+
+      // If authentication error, redirect to login
+      if (err.message.includes('Authentication failed')) {
+        setTimeout(() => {
+          window.location.href = '/admin/login';
+        }, 2000);
+      }
     } finally {
       setLoading(false);
     }
@@ -249,16 +267,17 @@ function PreviousReports() {
     }
   };
 
-  // Function to handle authentication (you'll need to implement this based on your auth system)
-  const handleLogin = () => {
-    // In a real application, this would open a login modal or redirect to login page
-    // For now, we'll prompt for a token
-    const token = prompt('Please enter your authentication token:');
-    if (token) {
-      setAuthToken(token);
-      setError(null);
-      fetchReports();
+  const handleRetry = () => {
+    const authToken = getAuthToken();
+    if (!authToken) {
+      window.location.href = '/admin/login';
+      return;
     }
+    fetchReports();
+  };
+
+  const handleLoginRedirect = () => {
+    window.location.href = '/admin/login';
   };
 
   if (loading) {
@@ -278,14 +297,14 @@ function PreviousReports() {
         <p className="text-red-600 mb-4">{error}</p>
         <div className="flex gap-2 justify-center">
           <button
-            onClick={fetchReports}
+            onClick={handleRetry}
             className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
           >
             Retry
           </button>
           {error.includes('authentication') && (
             <button
-              onClick={handleLogin}
+              onClick={handleLoginRedirect}
               className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
             >
               Login
@@ -303,6 +322,11 @@ function PreviousReports() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Previous Reports</h1>
           <p className="text-gray-600 mt-1">View and manage all completed lab reports</p>
+          {admin && (
+            <p className="text-sm text-gray-500 mt-1">
+              Logged in as: {admin.name || admin.email} ({admin.role || 'Admin'})
+            </p>
+          )}
         </div>
         <div className="flex items-center space-x-4">
           <button
@@ -316,24 +340,6 @@ function PreviousReports() {
           </div>
         </div>
       </div>
-
-      {/* Authentication Notice */}
-      {!authToken && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
-            <p className="text-yellow-800 text-sm">
-              <strong>Authentication Required:</strong> Please login to view your lab reports.
-              <button
-                onClick={handleLogin}
-                className="ml-2 text-blue-600 hover:text-blue-800 underline"
-              >
-                Login Now
-              </button>
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Filters and Search */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
