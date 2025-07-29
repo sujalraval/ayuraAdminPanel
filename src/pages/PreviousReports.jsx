@@ -48,8 +48,9 @@ function PreviousReports({ admin }) {
         throw new Error('No authentication token found. Please login again.');
       }
 
-      // Use admin-specific endpoint
-      const response = await fetch(`${API_BASE_URL}/orders/reports`, {
+      // Use existing /orders/all endpoint instead of /orders/reports
+      console.log('Fetching reports from /orders/all endpoint...');
+      const response = await fetch(`${API_BASE_URL}/orders/all`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${authToken}`,
@@ -70,30 +71,53 @@ function PreviousReports({ admin }) {
       }
 
       const data = await response.json();
+      console.log('Raw API response:', data);
 
-      if (data.success) {
+      if (data.success && Array.isArray(data.orders)) {
+        // Filter only orders that have reports (report submitted or completed status)
+        const ordersWithReports = data.orders.filter(order => {
+          const hasReport = (order.status === 'report submitted' || order.status === 'completed') &&
+            order.reportUrl &&
+            order.reportUrl.trim() !== '';
+          return hasReport;
+        });
+
+        console.log(`Found ${ordersWithReports.length} orders with reports out of ${data.orders.length} total orders`);
+
         // Transform orders into report format
-        const transformedReports = data.orders.map(order => ({
-          id: order._id,
-          reportId: `RPT-${order._id.slice(-6).toUpperCase()}`,
-          patientName: order.patientInfo.name,
-          patientId: order.patientInfo.memberId || order.patientInfo.userId || 'N/A',
-          testType: order.cartItems.map(item => item.testName).join(', '),
-          labs: [...new Set(order.cartItems.map(item => item.lab))].join(', '),
-          reportDate: order.createdAt,
-          completedDate: order.updatedAt,
-          status: order.status,
-          priority: determinePriority(order),
-          reportUrl: order.reportUrl,
-          totalPrice: order.totalPrice,
-          paymentMethod: order.paymentMethod,
-          technicianNotes: order.technicianNotes
-        }));
+        const transformedReports = ordersWithReports.map(order => {
+          // Handle potential missing or malformed data
+          const patientInfo = order.patientInfo || {};
+          const cartItems = order.cartItems || [];
 
+          return {
+            id: order._id,
+            reportId: `RPT-${order._id.slice(-6).toUpperCase()}`,
+            patientName: patientInfo.name || 'Unknown Patient',
+            patientId: patientInfo.memberId || patientInfo.userId || order._id.slice(-8),
+            testType: cartItems.length > 0
+              ? cartItems.map(item => item.testName || 'Unknown Test').join(', ')
+              : 'No Tests Listed',
+            labs: cartItems.length > 0
+              ? [...new Set(cartItems.map(item => item.lab || 'Unknown Lab'))].join(', ')
+              : 'No Labs Listed',
+            reportDate: order.createdAt,
+            completedDate: order.updatedAt,
+            status: order.status,
+            priority: determinePriority(order),
+            reportUrl: order.reportUrl,
+            totalPrice: order.totalPrice || 0,
+            paymentMethod: order.paymentMethod || 'Not specified',
+            technicianNotes: order.technicianNotes || ''
+          };
+        });
+
+        console.log('Transformed reports:', transformedReports);
         setReports(transformedReports);
         setFilteredReports(transformedReports);
       } else {
-        throw new Error(data.message || 'Failed to fetch reports');
+        console.error('Unexpected API response format:', data);
+        throw new Error(data.message || 'Failed to fetch reports - invalid response format');
       }
     } catch (err) {
       console.error('Error fetching reports:', err);
@@ -146,7 +170,7 @@ function PreviousReports({ admin }) {
 
       switch (selectedDateRange) {
         case 'today': {
-          filterDate.setDate(today.getDate());
+          filterDate.setHours(0, 0, 0, 0);
           break;
         }
         case 'week': {
@@ -165,9 +189,10 @@ function PreviousReports({ admin }) {
           break;
       }
 
-      filtered = filtered.filter(report =>
-        new Date(report.completedDate) >= filterDate
-      );
+      filtered = filtered.filter(report => {
+        const completedDate = new Date(report.completedDate);
+        return completedDate >= filterDate;
+      });
     }
 
     // Sort
@@ -192,13 +217,13 @@ function PreviousReports({ admin }) {
         }
         case 'priority': {
           const priorityOrder = { urgent: 3, high: 2, normal: 1 };
-          aValue = priorityOrder[a.priority];
-          bValue = priorityOrder[b.priority];
+          aValue = priorityOrder[a.priority] || 1;
+          bValue = priorityOrder[b.priority] || 1;
           break;
         }
         default: {
-          aValue = a[sortBy];
-          bValue = b[sortBy];
+          aValue = a[sortBy] || '';
+          bValue = b[sortBy] || '';
           break;
         }
       }
@@ -335,6 +360,16 @@ function PreviousReports({ admin }) {
           </div>
         </div>
       </div>
+
+      {/* Debug Info (remove in production) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-sm text-yellow-800">
+            <strong>Debug:</strong> Using /orders/all endpoint.
+            Found {reports.length} reports with valid reportUrl.
+          </p>
+        </div>
+      )}
 
       {/* Filters and Search */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -522,7 +557,7 @@ function PreviousReports({ admin }) {
             <p className="text-gray-500">
               {searchTerm || selectedStatus !== 'all' || selectedDateRange !== 'all'
                 ? 'Try adjusting your filters or search terms'
-                : 'No previous reports available yet'
+                : 'No completed lab reports with uploaded files found'
               }
             </p>
           </div>
