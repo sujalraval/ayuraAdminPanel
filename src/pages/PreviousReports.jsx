@@ -48,7 +48,8 @@ function PreviousReports({ admin }) {
         throw new Error('No authentication token found. Please login again.');
       }
 
-      const response = await fetch(`${API_BASE_URL}/orders/user`, {
+      // Use admin-specific endpoint
+      const response = await fetch(`${API_BASE_URL}/orders/reports`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${authToken}`,
@@ -71,14 +72,8 @@ function PreviousReports({ admin }) {
       const data = await response.json();
 
       if (data.success) {
-        // Filter only orders that have reports (report submitted or completed status)
-        const ordersWithReports = data.orders.filter(order =>
-          (order.status === 'report submitted' || order.status === 'completed') &&
-          order.reportUrl
-        );
-
         // Transform orders into report format
-        const transformedReports = ordersWithReports.map(order => ({
+        const transformedReports = data.orders.map(order => ({
           id: order._id,
           reportId: `RPT-${order._id.slice(-6).toUpperCase()}`,
           patientName: order.patientInfo.name,
