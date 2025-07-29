@@ -60,6 +60,8 @@ const LabTestsPanel = () => {
 
     const handleSave = async () => {
         try {
+            console.log('Form data being sent:', formData); // Debug log
+
             if (editingItem) {
                 const res = await axios.put(`/lab-tests/${editingItem._id}`, formData);
                 setLabTests((prev) =>
@@ -67,13 +69,16 @@ const LabTestsPanel = () => {
                 );
             } else {
                 const res = await axios.post('/lab-tests', formData);
+                console.log('Response from server:', res.data); // Debug log
                 setLabTests((prev) => [...prev, res.data]);
             }
             closeModal();
         } catch (err) {
             console.error('Save failed:', err);
+            console.error('Error response:', err.response?.data); // Debug log
         }
     };
+
 
     const handleChange = (e) => {
         const { name, value } = e.target;
