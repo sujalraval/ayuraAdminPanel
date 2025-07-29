@@ -153,6 +153,7 @@ export default function withAdminAuth(Component, allowedRoles = []) {
             return null;
         }
 
+        // Pass admin data as props to the wrapped component
         return <Component {...props} admin={admin} />;
     };
 }
