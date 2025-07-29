@@ -23,8 +23,12 @@ function PreviousReports() {
   const [sortOrder, setSortOrder] = useState('desc');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [authToken, setAuthToken] = useState(null); // No default token - user must authenticate
 
-  // Fetch reports from API
+  // Production API configuration
+  const API_BASE_URL = 'https://ayuras.life/api/v1';
+
+  // Fetch reports from production API
   useEffect(() => {
     fetchReports();
   }, []);
@@ -34,20 +38,22 @@ function PreviousReports() {
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
-      if (!token) {
+      if (!authToken) {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('https://ayuras.life/api/v1/orders/user', {
+      const response = await fetch(`${API_BASE_URL}/orders/user`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json'
         }
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Please login again.');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -94,7 +100,7 @@ function PreviousReports() {
   // Determine priority based on order characteristics
   const determinePriority = (order) => {
     const totalPrice = order.totalPrice || 0;
-    const testCount = order.cartItems.length;
+    const testCount = order.cartItems?.length || 0;
 
     if (totalPrice > 5000 || testCount > 5) return 'high';
     if (totalPrice > 2000 || testCount > 2) return 'normal';
@@ -126,27 +132,29 @@ function PreviousReports() {
       const filterDate = new Date();
 
       switch (selectedDateRange) {
-        case 'today':
+        case 'today': {
           filterDate.setDate(today.getDate());
           break;
-        case 'week':
+        }
+        case 'week': {
           filterDate.setDate(today.getDate() - 7);
           break;
-        case 'month':
+        }
+        case 'month': {
           filterDate.setMonth(today.getMonth() - 1);
           break;
-        case 'quarter':
+        }
+        case 'quarter': {
           filterDate.setMonth(today.getMonth() - 3);
           break;
+        }
         default:
           break;
       }
 
-      if (selectedDateRange !== 'all') {
-        filtered = filtered.filter(report =>
-          new Date(report.completedDate) >= filterDate
-        );
-      }
+      filtered = filtered.filter(report =>
+        new Date(report.completedDate) >= filterDate
+      );
     }
 
     // Sort
@@ -154,26 +162,32 @@ function PreviousReports() {
       let aValue, bValue;
 
       switch (sortBy) {
-        case 'date':
+        case 'date': {
           aValue = new Date(a.completedDate);
           bValue = new Date(b.completedDate);
           break;
-        case 'patient':
+        }
+        case 'patient': {
           aValue = a.patientName.toLowerCase();
           bValue = b.patientName.toLowerCase();
           break;
-        case 'test':
+        }
+        case 'test': {
           aValue = a.testType.toLowerCase();
           bValue = b.testType.toLowerCase();
           break;
-        case 'priority':
+        }
+        case 'priority': {
           const priorityOrder = { urgent: 3, high: 2, normal: 1 };
           aValue = priorityOrder[a.priority];
           bValue = priorityOrder[b.priority];
           break;
-        default:
+        }
+        default: {
           aValue = a[sortBy];
           bValue = b[sortBy];
+          break;
+        }
       }
 
       if (sortOrder === 'asc') {
@@ -188,18 +202,25 @@ function PreviousReports() {
 
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'urgent': return 'bg-red-100 text-red-800';
-      case 'high': return 'bg-orange-100 text-orange-800';
-      case 'normal': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'urgent':
+        return 'bg-red-100 text-red-800';
+      case 'high':
+        return 'bg-orange-100 text-orange-800';
+      case 'normal':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'report submitted': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'report submitted':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -228,6 +249,18 @@ function PreviousReports() {
     }
   };
 
+  // Function to handle authentication (you'll need to implement this based on your auth system)
+  const handleLogin = () => {
+    // In a real application, this would open a login modal or redirect to login page
+    // For now, we'll prompt for a token
+    const token = prompt('Please enter your authentication token:');
+    if (token) {
+      setAuthToken(token);
+      setError(null);
+      fetchReports();
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -243,12 +276,22 @@ function PreviousReports() {
         <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
         <h3 className="text-lg font-medium text-red-800 mb-2">Error Loading Reports</h3>
         <p className="text-red-600 mb-4">{error}</p>
-        <button
-          onClick={fetchReports}
-          className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
-        >
-          Retry
-        </button>
+        <div className="flex gap-2 justify-center">
+          <button
+            onClick={fetchReports}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            Retry
+          </button>
+          {error.includes('authentication') && (
+            <button
+              onClick={handleLogin}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Login
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -273,6 +316,24 @@ function PreviousReports() {
           </div>
         </div>
       </div>
+
+      {/* Authentication Notice */}
+      {!authToken && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
+            <p className="text-yellow-800 text-sm">
+              <strong>Authentication Required:</strong> Please login to view your lab reports.
+              <button
+                onClick={handleLogin}
+                className="ml-2 text-blue-600 hover:text-blue-800 underline"
+              >
+                Login Now
+              </button>
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Filters and Search */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
