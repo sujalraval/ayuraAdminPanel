@@ -51,40 +51,29 @@ api.interceptors.response.use(
     }
 );
 
-// Enhanced image URL correction function
-const getCorrectImageUrl = (imageUrl) => {
+// Enhanced image URL validation and fallback
+const getValidImageUrl = (imageUrl) => {
     if (!imageUrl) return null;
 
-    // Get the current domain for consistent URL generation
-    const currentDomain = window.location.hostname;
-    const isAdmin = currentDomain.includes('admin');
-    const baseDomain = isAdmin ? 'https://admin.ayuras.life' : 'https://ayuras.life';
-
-    console.log('Processing image URL:', { imageUrl, currentDomain, baseDomain });
-
-    // If it's already a full URL with the correct domain, return as is
-    if (imageUrl.startsWith(`${baseDomain}/uploads/expectations/`)) {
+    // If it's already a valid URL, return as is
+    if (imageUrl.startsWith('https://ayuras.life/uploads/expectations/')) {
         return imageUrl;
     }
 
-    // If it's a full URL but wrong domain, extract filename and reconstruct
-    if (imageUrl.startsWith('http')) {
-        try {
-            const urlParts = imageUrl.split('/');
-            const filename = urlParts[urlParts.length - 1];
-            const correctedUrl = `${baseDomain}/uploads/expectations/${filename}`;
-            console.log('Corrected URL:', correctedUrl);
-            return correctedUrl;
-        } catch (e) {
-            console.error('Error parsing image URL:', imageUrl, e);
-            return null;
-        }
+    // If it's a filename only, construct the full URL
+    if (!imageUrl.startsWith('http')) {
+        return `https://ayuras.life/uploads/expectations/${imageUrl}`;
     }
 
-    // If it's just a filename, construct the full URL
-    const fullUrl = `${baseDomain}/uploads/expectations/${imageUrl}`;
-    console.log('Constructed URL:', fullUrl);
-    return fullUrl;
+    // If it's a different domain, try to extract filename and reconstruct
+    try {
+        const urlParts = imageUrl.split('/');
+        const filename = urlParts[urlParts.length - 1];
+        return `https://ayuras.life/uploads/expectations/${filename}`;
+    } catch (e) {
+        console.error('Error processing image URL:', imageUrl, e);
+        return null;
+    }
 };
 
 const ExpectationsPanel = () => {
@@ -104,10 +93,9 @@ const ExpectationsPanel = () => {
         try {
             setLoading(true);
             setError(null);
-
             console.log('Fetching expectations...');
-            const res = await api.get('/expectations');
 
+            const res = await api.get('/expectations');
             console.log('Raw API response:', res.data);
 
             // Handle both array and object responses
@@ -117,7 +105,7 @@ const ExpectationsPanel = () => {
             const processedItems = itemsArray.map((item) => {
                 const processedItem = {
                     ...item,
-                    image: getCorrectImageUrl(item.image)
+                    image: getValidImageUrl(item.image)
                 };
                 console.log('Processed item:', processedItem);
                 return processedItem;
@@ -171,16 +159,12 @@ const ExpectationsPanel = () => {
             if (editId) {
                 console.log('Updating expectation:', editId);
                 response = await api.put(`/expectations/${editId}`, form, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data'
-                    }
+                    headers: { 'Content-Type': 'multipart/form-data' }
                 });
             } else {
                 console.log('Creating new expectation');
                 response = await api.post('/expectations', form, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data'
-                    }
+                    headers: { 'Content-Type': 'multipart/form-data' }
                 });
             }
 
@@ -218,8 +202,8 @@ const ExpectationsPanel = () => {
         try {
             setLoading(true);
             setError(null);
-
             console.log('Deleting expectation:', id);
+
             await api.delete(`/expectations/${id}`);
             await fetchItems();
         } catch (error) {
@@ -243,26 +227,10 @@ const ExpectationsPanel = () => {
     };
 
     const handleImageError = (e, item) => {
-        console.error('Image failed to load:', {
-            src: e.target.src,
-            item: item
-        });
-
+        console.error('Image failed to load:', { src: e.target.src, item: item });
         e.target.onerror = null; // Prevent infinite loop
 
-        // Try alternative URL construction
-        if (item && item.image && !e.target.src.includes('data:image')) {
-            const filename = item.image.split('/').pop();
-            const alternativeUrl = `https://ayuras.life/uploads/expectations/${filename}`;
-
-            if (e.target.src !== alternativeUrl) {
-                console.log('Trying alternative URL:', alternativeUrl);
-                e.target.src = alternativeUrl;
-                return;
-            }
-        }
-
-        // Show placeholder
+        // Show placeholder immediately
         e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5Ij5JbWFnZSBOb3QgRm91bmQ8L3RleHQ+PC9zdmc+';
     };
 
@@ -290,19 +258,7 @@ const ExpectationsPanel = () => {
                 setImagePreview(e.target.result);
             };
             reader.readAsDataURL(file);
-
             setError(null);
-        }
-    };
-
-    const testImageUrl = async (url) => {
-        try {
-            const response = await fetch(url, { method: 'HEAD' });
-            console.log('Image test result:', { url, status: response.status, ok: response.ok });
-            return response.ok;
-        } catch (error) {
-            console.error('Image test failed:', { url, error: error.message });
-            return false;
         }
     };
 
@@ -311,12 +267,12 @@ const ExpectationsPanel = () => {
     };
 
     return (
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Expectations Management</h2>
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">Expectations Management</h2>
                 <button
                     onClick={() => setModalOpen(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50"
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
                     disabled={loading}
                 >
                     <Plus size={20} />
@@ -324,76 +280,54 @@ const ExpectationsPanel = () => {
                 </button>
             </div>
 
-            {/* Error Display */}
             {error && (
-                <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
                     {error}
-                    <button
-                        onClick={() => setError(null)}
-                        className="ml-2 text-red-500 hover:text-red-700"
-                    >
-                        ×
-                    </button>
                 </div>
             )}
 
-            {/* Loading State */}
-            {loading && (
+            {loading && !modalOpen && (
                 <div className="text-center py-4">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     <p className="mt-2 text-gray-600">Loading...</p>
                 </div>
             )}
 
-            {/* Items Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {items.map((item) => (
-                    <div key={item._id} className="bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-                        <div className="mb-4">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-2">{item.title}</h3>
-                            <p className="text-gray-600 text-sm line-clamp-3">{item.description}</p>
-                        </div>
-
-                        {item.image && (
-                            <div className="mb-4 relative">
+                    <div key={item._id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                        <div className="h-48 bg-gray-200 relative">
+                            {item.image ? (
                                 <img
                                     src={item.image}
                                     alt={item.title}
-                                    className="w-full h-48 object-cover rounded-lg"
+                                    className="w-full h-full object-cover"
                                     onError={(e) => handleImageError(e, item)}
                                     onLoad={handleImageLoad}
-                                    crossOrigin="anonymous"
                                 />
-                                <button
-                                    onClick={() => testImageUrl(item.image)}
-                                    className="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-1 rounded"
-                                    title="Test image URL"
-                                >
-                                    <Eye size={16} />
-                                </button>
-                            </div>
-                        )}
-
-                        <div className="flex justify-between items-center">
-                            <span className="text-xs text-gray-500">
-                                ID: {item._id?.slice(-6)}
-                            </span>
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                    <span className="text-gray-400">No Image</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4">
+                            <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
+                            <p className="text-gray-600 text-sm mb-4 line-clamp-3">{item.description}</p>
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => handleEdit(item)}
-                                    className="text-blue-600 hover:text-blue-800 p-2 rounded hover:bg-blue-50"
+                                    className="bg-yellow-500 text-white p-2 rounded hover:bg-yellow-600"
                                     disabled={loading}
-                                    title="Edit"
                                 >
-                                    <Edit2 size={18} />
+                                    <Edit2 size={16} />
                                 </button>
                                 <button
                                     onClick={() => handleDelete(item._id)}
-                                    className="text-red-600 hover:text-red-800 p-2 rounded hover:bg-red-50"
+                                    className="bg-red-500 text-white p-2 rounded hover:bg-red-600"
                                     disabled={loading}
-                                    title="Delete"
                                 >
-                                    <Trash2 size={18} />
+                                    <Trash2 size={16} />
                                 </button>
                             </div>
                         </div>
@@ -401,32 +335,27 @@ const ExpectationsPanel = () => {
                 ))}
             </div>
 
-            {/* Empty State */}
             {items.length === 0 && !loading && (
-                <div className="text-center py-12 text-gray-500">
-                    <p className="text-lg mb-2">No expectations found</p>
-                    <p className="text-sm">Add your first expectation to get started!</p>
+                <div className="text-center py-12">
+                    <div className="text-gray-400 mb-4">
+                        <Eye size={48} className="mx-auto" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No expectations found</h3>
+                    <p className="text-gray-500 mb-4">Add your first expectation to get started!</p>
                 </div>
             )}
 
             {/* Modal */}
             {modalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
                         <h3 className="text-lg font-semibold mb-4">
                             {editId ? 'Edit Expectation' : 'Add New Expectation'}
                         </h3>
 
-                        {/* Modal Error Display */}
-                        {error && (
-                            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
-                                {error}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSubmit}>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Title *
                                 </label>
                                 <input
@@ -434,71 +363,57 @@ const ExpectationsPanel = () => {
                                     value={formData.title}
                                     onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    maxLength={1000}
                                     required
-                                    disabled={loading}
                                 />
                             </div>
 
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Description *
                                 </label>
                                 <textarea
                                     value={formData.description}
                                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     rows={4}
-                                    maxLength={10000}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     required
-                                    disabled={loading}
                                 />
                             </div>
 
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Image {!editId && '*'}
                                 </label>
                                 <input
                                     type="file"
+                                    accept="image/*"
                                     onChange={handleFileChange}
-                                    accept="image/jpeg,image/jpg,image/png"
                                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    required={!editId}
-                                    disabled={loading}
                                 />
-                                <p className="text-xs text-gray-500 mt-1">
-                                    Max size: 10MB. Formats: JPEG, JPG, PNG
-                                </p>
-
-                                {/* Image Preview */}
                                 {imagePreview && (
-                                    <div className="mt-3">
-                                        <p className="text-sm text-gray-600 mb-2">Preview:</p>
-                                        <img
-                                            src={imagePreview}
-                                            alt="Preview"
-                                            className="w-full h-32 object-cover rounded border"
-                                        />
-                                    </div>
+                                    <img
+                                        src={imagePreview}
+                                        alt="Preview"
+                                        className="mt-2 w-full h-32 object-cover rounded"
+                                    />
                                 )}
                             </div>
 
-                            <div className="flex justify-end gap-2">
+                            <div className="flex gap-2 pt-4">
                                 <button
                                     type="button"
                                     onClick={closeModal}
-                                    className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                                    className="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600"
                                     disabled={loading}
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                                     disabled={loading}
                                 >
-                                    {loading ? 'Saving...' : (editId ? 'Update' : 'Create')}
+                                    {loading ? 'Saving...' : editId ? 'Update' : 'Save'}
                                 </button>
                             </div>
                         </form>
