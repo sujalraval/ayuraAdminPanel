@@ -24,7 +24,7 @@ const AddEditForm = ({ title, renderFields, onCancel, onSubmit }) => {
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                            className="px-4 py-2 bg-[#E23744] text-white rounded-md"
                         >
                             <Save className="h-4 w-4 inline mr-2" /> Save
                         </button>
