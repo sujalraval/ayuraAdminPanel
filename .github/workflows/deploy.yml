@@ -20,4 +20,7 @@ jobs:
           key: ${{ secrets.SSHKEY }}
           script: |
             cd /root/ayuracode/ayuraAdminPanel/
-            ./.scripts/deploy.sh
+            git clean -fd
+            # continue deployment...
+            npm install --yes
+            npx vite build --outDir /var/www/ayuraAdminPanel/dist
