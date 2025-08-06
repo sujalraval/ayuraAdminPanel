@@ -24,4 +24,5 @@ jobs:
             git clean -fd
             # continue deployment...
             npm install --yes
+            rm -rf /var/www/ayuraAdminPanel/dist/*
             npx vite build --outDir /var/www/ayuraAdminPanel/dist
