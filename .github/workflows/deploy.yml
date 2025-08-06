@@ -20,6 +20,7 @@ jobs:
           key: ${{ secrets.SSHKEY }}
           script: |
             cd /root/ayuracode/ayuraAdminPanel/
+            git pull origin main
             git clean -fd
             # continue deployment...
             npm install --yes
